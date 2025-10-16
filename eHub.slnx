@@ -1,0 +1,29 @@
+<Solution>
+  <Folder Name="/Playground/">
+    <Project Path="eHub.Playground.Assets\eHub.Playground.PlcConnector\eHub.Playground.PlcConnector.csproj" />
+    <Project Path="eHub.Playground.Assets\eHub.Playground.Scripts2\eHub.Playground.Scripts2.csproj" />
+    <Project Path="eHub.Playground.Assets\eHub.Playground.ScriptsHttpConnector\eHub.Playground.ScriptsHttpConnector.csproj" />
+    <Project Path="eHub.Playground.Assets\eHub.Playground.ScriptsMultipleDbContexts\eHub.Playground.ScriptsMultipleDbContexts.csproj" />
+    <Project Path="eHub.Playground.Assets\eHub.Playground.ScriptsOAuth2\eHub.Playground.ScriptsOAuth2.csproj" />
+    <Project Path="eHub.Playground.Assets\eHub.Playground.ScriptsPacketTransfer\eHub.Playground.ScriptsPacketTransfer.csproj" />
+    <Project Path="eHub.Playground.Assets\eHub.Playground.Scripts\eHub.Playground.Scripts.csproj" />
+  </Folder>
+  <Folder Name="/_SolutionFiles/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Directory.Packages.props" />
+    <File Path="nuget.config" />
+    <File Path="Readme.md" />
+    <File Path="spelling_exceptions.dic" />
+  </Folder>
+  <Project Path="eHub.Contracts\eHub.Contracts.csproj" />
+  <Project Path="eHub.Manager\eHub.Manager.csproj" Type="Classic C#" />
+  <Project Path="eHub.PlugIn\eHub.PlugIn.csproj" />
+  <Project Path="eHub.Tests\eHub.Tests.csproj" />
+  <Project Path="eHub.UI.Tests\eHub.UI.Tests.csproj" />
+  <Project Path="eHub.UI\eHub.UI.csproj" />
+  <Project Path="eHub\eHub.csproj" />
+</Solution>

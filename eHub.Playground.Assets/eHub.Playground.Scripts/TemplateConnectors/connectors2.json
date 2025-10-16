@@ -1,0 +1,9 @@
+{
+  "Con_External_from_2": {
+    "Type": "eController.IntegrationHub.TestConnector",
+    "Enabled": false,
+    "Config": {
+      "Message": "External External 2"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+@using MudBlazor
+
+<div class="d-flex flex-row mt-2">
+    <div class="d-flex flex-column" style="margin-right: 1vh">
+        <ElCard Style="height: calc(100vh - 8vh); width: 30vh" Outlined="false">
+            <ElCardHeader Style="background-color: var(--mud-palette-primary); height: 46px; border-start-start-radius: 3px;">
+                <CardHeaderContent>
+                    <MudText Style="color: white;" Typo="Typo.body1">@Localizer["EHubInstances"]</MudText>
+                </CardHeaderContent>
+            </ElCardHeader>
+            @if (_eHubInstances.Any())
+            {
+                <ElList Color=Color.Info Clickable="true" @bind-SelectedValue="CurrentInstance">
+                    @foreach (var eHubInstance in _eHubInstances)
+                    {
+                        <ElListItem Value="@eHubInstance"
+                                    Icon="@Icons.Material.Filled.Info"
+                                    IconSize="Size.Small"
+                                    Text="@(eHubInstance.Descriptor.GetDisplayNameOrFallback())"
+                                    IconColor="Color.Primary" />
+                    }
+                </ElList>
+            }
+            else
+            {
+                <ElText Color="Color.Dark" Style="margin-top: 3vh; justify-content: center; display: flex"
+                        Typo="Typo.body2" Align="Align.Center">@Localizer["NoEHubInstanceFound"]</ElText>
+            }
+
+        </ElCard>
+    </div>
+
+    <div class="d-flex flex-column">
+        <ElCard Style="width: 82.5vw; height: calc(100vh - 8vh);">
+            <MudTabs Rounded="true" Color="@Color.Primary">
+                <MudTabPanel Text="@nameof(Controllers)">
+                    @if (_currentInstance != null)
+                    {
+                        <Controllers @ref="@_controllers" InstanceName="@(_currentInstance.Descriptor.Locator.ToString())" />
+                    }
+                </MudTabPanel>
+                <MudTabPanel Text="@nameof(Connectors)">
+                    @if (_currentInstance != null)
+                    {
+                        <Connectors @ref="@_connectors" InstanceName="@(_currentInstance.Descriptor.Locator.ToString())" />
+                    }
+                </MudTabPanel>
+            </MudTabs>
+        </ElCard>
+    </div>
+</div>

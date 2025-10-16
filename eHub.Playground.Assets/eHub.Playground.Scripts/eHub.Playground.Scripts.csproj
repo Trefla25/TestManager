@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <OutputType>Library</OutputType>
+
+        <ePluginMode>Script</ePluginMode>
+        <ePluginPkgDependencies>true</ePluginPkgDependencies>
+        <RootNamespace>eController.IntegrationHub.Scripts</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="eController.Util" Version="3.1.1" />
+        <PackageReference Include="eController.CommonLib" Version="3.0.*" />
+        <PackageReference Include="eController.DataLib" Version="4.2.*" />
+        <PackageReference Include="ePlugin.MsBuild" Version="2.4.17">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\eHub.PlugIn\eHub.PlugIn.csproj" />
+    </ItemGroup>
+
+</Project>

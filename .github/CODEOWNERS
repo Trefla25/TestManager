@@ -1,0 +1,11 @@
+# eHub
+/.github/CODEOWNERS	@PanteaCristian @DanielPantea @Splamy
+/eHub/ @Splamy @DanielPantea @PanteaCristian
+/eHub.Contracts/ @Splamy @DanielPantea @PanteaCristian
+/eHub.Manager/ @Splamy @DanielPantea @PanteaCristian
+/eHub.PlugIn/ @Splamy @DanielPantea @PanteaCristian
+/eHub.Tests/ @Splamy @DanielPantea @PanteaCristian
+/eHub.UI/ @Splamy @DanielPantea @PanteaCristian
+/eHub.UI.Tests/ @Splamy @DanielPantea @PanteaCristian
+**/packages.lock.json 
+**/version.json

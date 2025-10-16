@@ -1,0 +1,99 @@
+@using eHub.Contracts.UIConfig
+@using eController.WebUI.Utility.DynamicComponent
+@using eHub.UI.Util
+@inherits FrameworkComponent
+
+<MudDialog ClassContent="py-0">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.DateRange" Class="mr-3" />
+            @Localizer["Filter"]
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <DateTimeRangePicker @bind-Start="StartDate" @bind-End="EndDate" />
+        <div style="display:flex; align-items: flex-end;">
+            <MudButton Color="Color.Primary" OnClick="AddNewFilter">@Localizer["AddColumnFilter"]</MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Medium" Color="Color.Primary" Title="@Localizer["RemoveAll"]" OnClick="RemoveAllColumnFilters" />
+        </div>
+        <div class="column-filter-container" syle="padding-botton: 10px">
+            @for (int i = 0; i < _newPacketColumnFilters.Count; i++)
+            {
+                var filter = _newPacketColumnFilters[i];
+                var position = i;
+
+                <div style="display:flex; align-items: flex-end; padding-bottom: 10px">
+                    <MudSelect T="string"
+                               Value="filter.ColumnName"
+                               Label="Column"
+                               AnchorOrigin="Origin.BottomCenter"
+                               Style="width:135px"
+                               ValueChanged="(value) => FilteredColumnChanged(filter, value)">
+                        @foreach (var col in _packetColumns)
+                        {
+                            <MudSelectItem Value="@col" />
+                        }
+                    </MudSelect>
+
+                    <MudSelect T="string" @bind-Value="filter.Operator" Label="Operator" AnchorOrigin="Origin.BottomCenter" Style="width:125px" Disabled="!filter.OperatorEnabled">
+                        @foreach (var op in GetOperatorsByColumnName(filter.ColumnName))
+                        {
+                            <MudSelectItem Value="op" />
+                        }
+                    </MudSelect>
+                    @if (filter.ColumnName is not null && GetColumnFieldType(filter.ColumnName).IsDateTime)
+                    {
+                        <MudGrid>
+                            <MudItem xs="7" Style="padding-right: 0px">
+                                <MudDatePicker Label="@Localizer["Date"]" Date="GetDateFromValue(filter.Value)" Editable="true" DateChanged="(date) => FilteredDateChanged(filter, date)" DateFormat="dd.MM.yyyy" />
+                            </MudItem>
+                            <MudItem xs="5" Style="padding-left: 0px">
+                                <MudTimePicker Label="@Localizer["Time"]" Time="GetTimeFromValue(filter.Value)" Editable="true" TimeChanged="(time) => FilteredTimeChanged(filter, time)" />
+                            </MudItem>
+                        </MudGrid>
+                    }
+                    else if (filter.ColumnName is not null && filter.ColumnName == nameof(PacketDto.Status))
+                    {
+                        <MudSelect T="string" @bind-Value="filter.Value" Label="Operator" AnchorOrigin="Origin.BottomCenter" Style="width:125px" Disabled="!filter.ValueEnabled">
+                            @foreach (var status in PacketHelper.Statuses)
+                            {
+                                var value = status.ToString();
+                                <MudSelectItem Value="@value" />
+                            }
+
+                        </MudSelect>
+                    }
+                    else if (filter.ColumnName is not null && GetColumnFieldType(filter.ColumnName).IsNumber)
+                    {
+                        <MudNumericField @bind-Value="filter.Value" Placeholder="@Localizer["Search"]" Adornment="Adornment.Start" Style="width:140px" InputType="InputType.Number"
+                                         AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 custom-number-input" Disabled="!filter.ValueEnabled" HideSpinButtons="true"></MudNumericField>
+                    }
+                    else if (filter.ColumnName is not null && GetColumnFieldType(filter.ColumnName).IsBoolean)
+                    {
+                        <MudSelect T="string"
+                                   @bind-Value="filter.Value"
+                                   Label="@Localizer["Value"]"
+                                   AnchorOrigin="Origin.BottomCenter"
+                                   Style="width:120px"
+                                   Disabled="!filter.ValueEnabled">
+                            <MudSelectItem Value="true.ToString()">@Localizer["True"]</MudSelectItem>
+                            <MudSelectItem Value="false.ToString()">@Localizer["False"]</MudSelectItem>
+
+                        </MudSelect>
+                    }
+                    else
+                    {
+                        <MudTextField @bind-Value="filter.Value" Placeholder="@Localizer["Search"]" Adornment="Adornment.Start" Style="width:140px"
+                                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" Disabled="!filter.ValueEnabled"></MudTextField>
+                    }
+
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" OnClick="() => RemoveFilter(filter)" Size="Size.Medium" Style="padding-bottom: 0px" />
+                </div>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@Localizer["Cancel"]</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">@Localizer["Ok"]</MudButton>
+    </DialogActions>
+</MudDialog>

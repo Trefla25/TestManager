@@ -1,0 +1,47 @@
+@using eHub.PlugIn.UI
+@using eController.WebUI.Utility.DynamicComponent
+@inherits FrameworkComponent
+
+@if (_dataDisplayFormat.IsDialog())
+{
+	<div Class="d-flex align-center flex-grow-1 gap-1">
+		@(Packet.PreviewData)
+		<MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+					   Size="Size.Small"
+					   OnClick="OnOpenDataDialog" />
+	</div>
+}
+else if (_treeDataDisplay is { } treeData)
+{
+	<MudTreeView Items="treeData" Context="treeContext">
+		<ItemTemplate>
+			@if (treeContext.IsRoot)
+			{
+				<MudTreeViewItem Items="@treeContext.TreeItems">
+					<BodyContent>
+						<MudText Typo="Typo.body2">@treeContext.Title</MudText>
+						@if (_dataDisplayFormat.IsDialog())
+						{
+							<MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+										   Size="Size.Small"
+										   Class="ms-3"
+										   OnClick="OnOpenDataDialog" />
+						}
+					
+					</BodyContent>
+				</MudTreeViewItem>
+			}
+			else
+			{
+				<MudTreeViewItem Items="@treeContext.TreeItems" 
+								 Value="@treeContext" 
+								 Text="@treeContext.Title" 
+								 TextTypo="Typo.body2" />
+			}
+		</ItemTemplate>
+	</MudTreeView>
+}
+else
+{
+	<div>@_data</div>
+}

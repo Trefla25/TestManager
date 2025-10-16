@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<Sdk Name="Microsoft.DotNet.PackageValidation" Version="1.0.0-preview.7.21379.12" />
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+
+		<!-- Nupkg -->
+		<PackageId>eHub.PlugIn</PackageId>
+		<Authors>ElementLogic</Authors>
+		<Company>Element Logic</Company>
+		<Copyright>Element Logic</Copyright>
+		<Trademark>eController</Trademark>
+		<PackageIcon>EAlone.png</PackageIcon>
+
+		<DebugType>Embedded</DebugType>
+		<EmbedAllSources>true</EmbedAllSources>
+
+		<IsPackable>true</IsPackable>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+
+<!--		<EnablePackageValidation>true</EnablePackageValidation>-->
+<!--		<PackageValidationBaselineVersion>1.7.0</PackageValidationBaselineVersion>-->
+        <!--<GenerateCompatibilitySuppressionFile>true</GenerateCompatibilitySuppressionFile>-->
+	</PropertyGroup>
+    
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
+		<None Include="assets\EAlone.png" Pack="true" PackagePath="" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="DotNet.ReproducibleBuilds" PrivateAssets="All" />
+	</ItemGroup>
+
+</Project>

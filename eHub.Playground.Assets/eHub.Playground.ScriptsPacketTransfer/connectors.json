@@ -1,0 +1,101 @@
+{
+    "Device01": {
+        "Type": "PacketConnector",
+        "Enabled": true,
+        "PacketTransfer": {
+            "DbPath": "C:\\Work\\Databases\\Device01.db",
+            "ChannelGroups": {
+                "Send": {
+                    "DbPollInterval": "1s",
+                    "PacketsPerCycle": 1,
+                    "PacketRetention": {
+                        "Enqueued": "5s",
+                        "InProgress": "5s",
+                        "Error": "5s",
+                        "Default": "1d"
+                    },
+                    "CleanerInterval": "1h",
+                    "Channels": [ "Device01ToDevice02_Data" ]
+                },
+                "SendAck": {
+                    "DbPollInterval": "3s",
+                    "PacketsPerCycle": 1,
+                    "PacketRetention": {
+                        "Enqueued": "5s",
+                        "InProgress": "5s",
+                        "Error": "5s",
+                        "Default": "1d"
+                    },
+                    "CleanerInterval": "5h",
+                    "Channels": [ "Device01ToDevice02_Ack" ],
+                    "CanResend": false
+                },
+                "Recv": {
+                    "DbPollInterval": "1s",
+                    "PacketsPerCycle": 1,
+                    "PacketRetention": {
+                        "Enqueued": "5s",
+                        "InProgress": "5s",
+                        "Error": "5s",
+                        "Default": "1d"
+                    },
+                    "CleanerInterval": "1h",
+                    "Channels": [ "Device02ToDevice01_Data" ]
+                }
+            }
+        },
+        "Config": {
+            "ConnectorName": "Device01",
+            "PairedConnectorName": "Device02",
+            "IpAddress": "127.0.0.1",
+            "SendPort": 3501,
+            "RecvPort": 3500,
+            "StatusIntervalSeconds": 4,
+            "AliveTimeout": true,
+            "ReceiveTimout": 35000,
+            "IgnoreLowerTelId": false
+        }
+    },
+    "Device02": {
+        "Type": "PacketConnector",
+        "Enabled": true,
+        "PacketTransfer": {
+            "DbPath": "C:\\Work\\Databases\\Device02.db",
+            "ChannelGroups": {
+                "Send": {
+                    "DbPollInterval": "3s",
+                    "PacketsPerCycle": 1,
+                    "PacketRetention": "5s",
+                    "CleanerInterval": "5h",
+                    "Channels": [ "Device02ToDevice01_Data" ]
+                },
+                "SendAck": {
+                    "DbPollInterval": "3s",
+                    "PacketsPerCycle": 1,
+                    "PacketRetention": "5s",
+                    "CleanerInterval": "5h",
+                    "Channels": [ "Device02ToDevice01_Ack" ],
+                    "CanResend": false
+                },
+                "Recv": {
+                    "DbPollInterval": "3s",
+                    "PacketsPerCycle": 1,
+                    "PacketRetention": "5s",
+                    "CleanerInterval": "5h",
+                    "Channels": [ "Device01ToDevice02_Data" ]
+                }
+            }
+        },
+        "Config": {
+            "ConnectorName": "Device02",
+            "PairedConnectorName": "Device01",
+            "IpAddress": "127.0.0.1",
+            "SendPort": 3701,
+            "RecvPort": 3700,
+            "StatusIntervalSeconds": 4,
+            "AliveTimeout": true,
+            "ReceiveTimout": 35000,
+            "IgnoreLowerTelId": false
+        }
+    }
+}

@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<IsPackable>true</IsPackable>
+        <StaticWebAssetFingerprintingEnabled>false</StaticWebAssetFingerprintingEnabled>
+        <RootNamespace>eHub.UI</RootNamespace>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<eUtilFeatures>$(eUtilFeatures),CollectionExtensions,TimeExtensions,DictionaryExtensions</eUtilFeatures>
+		<eUtilFeatures>$(eUtilFeatures),ObjUtil,TaskUtil</eUtilFeatures>
+		<eUtilFeatures>$(eUtilFeatures),Tasks.AwaitableAutoResetEvent</eUtilFeatures>
+	</PropertyGroup>
+
+    <ItemGroup>
+        
+    </ItemGroup>
+
+
+    <ItemGroup>
+		<ProjectReference Include="..\eHub.Contracts\eHub.Contracts.csproj" />
+	</ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="eHub.UI.Tests" />
+    </ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Components\" />
+	</ItemGroup>
+
+	<ItemGroup>
+        <PackageReference Include="eController.Util.Embed">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+	  <PackageReference Include="eController.WebUI.PlugIn" />
+	  <PackageReference Include="eController.WebUI.Utility" />
+	  <PackageReference Include="ElUI.ComponentLib" />
+	  <PackageReference Include="eMessenger" />
+	  <PackageReference Include="ePlugin.MsBuild">
+	    <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+	    <PrivateAssets>all</PrivateAssets>
+	  </PackageReference>
+	</ItemGroup>
+
+</Project>

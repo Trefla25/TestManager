@@ -1,0 +1,88 @@
+﻿@using eHub.PlugIn;
+@using eController.WebUI.Utility.DynamicComponent
+@inherits FrameworkComponent
+
+<MudDialog ClassContent="py-0">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.DirectionsRun" Class="mr-3" />
+            @Localizer["Action"]
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudCard Outlined="true">
+            <MudCardContent>
+                <MudButton Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Download"
+                           Size="Size.Large"
+                           Color="Color.Primary"
+                           OnClick="OpenExportDialog"
+                           Class="rounded-pill mud-width-full mb-1">
+                    @Localizer["Export"]
+                </MudButton>
+                <MudFileUpload T="IBrowserFile"
+                               FilesChanged="UploadPacketsFile"
+                               Accept=".json"
+                               Class="mt-0">
+                    <ButtonTemplate>
+                        <MudButton HtmlTag="label"
+                                   Variant="Variant.Filled"
+                                   StartIcon="@Icons.Material.Filled.Upload"
+                                   Size="Size.Large"
+                                   Color="Color.Primary"
+                                   Class="rounded-pill mud-width-full mb-1"
+                                   for="@context">
+                            @Localizer["Import"]
+                        </MudButton>
+                    </ButtonTemplate>
+                </MudFileUpload>
+                <MudFileUpload T="IBrowserFile"
+                               FilesChanged="UploadJsonViewFile"
+                               Accept=".json"
+                               Class="mt-0">
+                    <ButtonTemplate>
+                        <MudButton HtmlTag="label"
+                                   Variant="Variant.Filled"
+                                   StartIcon="@Icons.Material.Filled.Search"
+                                   Size="Size.Large"
+                                   Color="Color.Primary"
+                                   Class="rounded-pill mud-width-full mb-1"
+                                   for="@context">
+                            @Localizer["ExportViewer"]
+                        </MudButton>
+                    </ButtonTemplate>
+                </MudFileUpload>
+                <MudButton Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Stop"
+                           Size="Size.Large"
+                           Color="Color.Primary"
+                           OnClick="StopSelected"
+                           Disabled="!IsAdministrator || !SelectedPackets.Any(p => !p.Status.IsProcessed())"
+                           Class="rounded-pill mud-width-full mb-1">
+                    @Localizer["ManualStop"]
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.DeleteSweep"
+                           Size="Size.Large"
+                           Color="Color.Primary"
+                           OnClick="DeleteSelected"
+                           Disabled="!IsAdministrator || !SelectedPackets.Any()"
+                           Class="rounded-pill mud-width-full mb-1">
+                    @Localizer["DeleteSelected"]
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.DeleteForever"
+                           Size="Size.Large"
+                           Color="Color.Primary"
+                           OnClick="DeleteAll"
+                           Disabled="!IsAdministrator || !Packets.Any()"
+                           Class="rounded-pill mud-width-full">
+                    @Localizer["DeleteAll"]
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@Localizer["Cancel"]</MudButton>
+    </DialogActions>
+</MudDialog>

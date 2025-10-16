@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net9.0": {
+      "eController.Util.Embed": {
+        "type": "Direct",
+        "requested": "[3.1.1, )",
+        "resolved": "3.1.1",
+        "contentHash": "AEuNiGKMIvifXyVm6YkIJSOHM6cYG/f18zjzy+0UHDhlrTpiqx63khemvqVhGFeg0JGrgUJUx3cbQ6LX890I4w=="
+      },
+      "Microsoft.VisualStudio.Threading.Analyzers": {
+        "type": "Direct",
+        "requested": "[17.13.2, )",
+        "resolved": "17.13.2",
+        "contentHash": "Qcd8IlaTXZVq3wolBnzby1P7kWihdWaExtD8riumiKuG1sHa8EgjV/o70TMjTaeUMhomBbhfdC9OPwAHoZfnjQ=="
+      },
+      "Nerdbank.GitVersioning": {
+        "type": "Direct",
+        "requested": "[3.7.115, )",
+        "resolved": "3.7.115",
+        "contentHash": "EpXamaAdRfG/BMxGgvZlTM0npRnkmXUjAj8OdNKd17t4oN+2nvjdv/KnFmzOOMDqvlwB49UCwtOHJrAQTfUBtQ=="
+      },
+      "ehub.plugin": {
+        "type": "Project"
+      }
+    }
+  }
+}

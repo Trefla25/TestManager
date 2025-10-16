@@ -1,0 +1,9 @@
+{
+    "profiles": {
+        "Run Tests": {
+            "commandName": "Executable",
+            "executablePath": "$(SolutionDir)\\eController.IntegrationHub\\bin\\Debug\\net7.0\\publish\\eController.IntegrationHub.exe",
+            "workingDirectory": "$(SolutionDir)\\eController.IntegrationHub.Scripts"
+        }
+    }
+}

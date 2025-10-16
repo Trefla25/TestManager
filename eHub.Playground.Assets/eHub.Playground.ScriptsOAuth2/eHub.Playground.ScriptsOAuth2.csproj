@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+
+        <ePluginMode>Script</ePluginMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Remove="connectors.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="connectors.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="eController.Util" Version="3.1.1" />
+        <PackageReference Include="eMessenger" Version="1.7.*" />
+        <PackageReference Include="ePlugin.MsBuild" Version="2.4.17">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\eHub.PlugIn\eHub.PlugIn.csproj" />
+    </ItemGroup>
+
+</Project>

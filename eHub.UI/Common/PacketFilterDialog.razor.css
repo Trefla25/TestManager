@@ -1,0 +1,17 @@
+.column-filter-container {
+    max-height: 500px;
+    overflow-y: scroll;
+}
+
+.custom-number-input input[type="number"]::-webkit-outer-spin-button,
+.custom-number-input input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+/* Hide spin buttons in number input fields for Firefox */
+.custom-number-input input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}

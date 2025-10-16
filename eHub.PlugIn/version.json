@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/main/src/NerdBank.GitVersioning/version.schema.json",
+  "version": "1.13.0",
+  "publicReleaseRefSpec": [
+    "^refs/heads/(master|main|\\w+-force-deploy)$"
+  ],
+  "release": {
+    "tagName": "ehub_plugin/v{version}",
+    "branchName": "ehub_plugin/v{version}",
+    "firstUnstableTag": "dev"
+  },
+  "pathFilters": [
+    "/eController.IntegrationHub.PlugIn"
+  ]
+}

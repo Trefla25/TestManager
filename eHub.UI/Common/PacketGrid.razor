@@ -1,0 +1,239 @@
+@using eHub.Contracts.UIConfig
+@using eHub.PlugIn
+@using eController.WebUI.Utility.DynamicComponent
+@using eHub.UI.Util
+@inherits FrameworkComponent
+
+@* This does not work if put in PacketGrid.razor.cs. Still looking for a solution *@
+<style>
+	td.mud-table-cell {
+		padding: 0px;
+	}
+</style>
+
+<div style="@($"height: {Height ?? "100%"};")" @ref="_packetGridRef">
+	<MudDataGrid @ref="_grid" T="PacketGridRow"
+				 FixedHeader="true"
+				 Style="height: 100%"
+				 Height="@GetHeight()"
+				 Virtualize="true"
+				 OverscanCount="25"
+				 Items="@(_gridPackets.Select(p => p.Value))"
+				 SortMode="SortMode.Multiple"
+				 Filterable="true"
+				 FilterMode="@DataGridFilterMode.ColumnFilterMenu"
+				 QuickFilter="@QuickFilter"
+				 RowsPerPage="LiveMode ? int.MaxValue : ViewPacketCount ?? int.MaxValue"
+				 RowClick="@RowClicked"
+				 RowStyle="vertical-align: middle;"
+				 RowStyleFunc="@GetPacketRowStyle"
+				 RowClassFunc="@((model, index)=>GetClassNameById(model.Packet.Id))"
+				 Loading="@Loading">
+		<ToolBarContent>
+			<div class="custom-toolbar">
+				<MudIcon Icon="@Icons.Material.Filled.Monitor" Class="mr-3" />
+				<MudText Typo="Typo.h6" Style="overflow: hidden; text-overflow: ellipsis; max-width: 40%; text-wrap: nowrap;">@Title</MudText>
+
+				<MudSpacer />
+				<div class="custom-search-container">
+					<MudTextField @bind-Value="_searchString" Placeholder="@Localizer["Search"]" Adornment="Adornment.Start" Immediate="true"
+								  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+				</div>
+			</div>
+		</ToolBarContent>
+		<Columns>
+			<TemplateColumn CellClass="pa-0 text-center" CellStyle="vertical-align: middle; width: 50px;" Filterable="false" Sortable="false">
+
+				<CellTemplate>
+					@if (GroupPackets && Packets.Any(x => x.ParentId == context.Item.Packet.Id))
+					{
+						<MudIconButton Icon="@(context.Item.ShowChildContent ? Icons.Material.Filled.KeyboardArrowDown : Icons.Material.Filled.KeyboardArrowRight)"
+									   OnClick="@(() => context.Item.ShowChildContent = !context.Item.ShowChildContent)" />
+					}
+				</CellTemplate>
+			</TemplateColumn>
+
+			@{
+				var idColumnConfig = GetColumnConfig(nameof(PacketDto.Id));
+				var dateCreatedColumnConfig = GetColumnConfig(nameof(PacketDto.DateCreated));
+				var dateChangedColumnConfig = GetColumnConfig(nameof(PacketDto.DateChanged));
+				var channelColumnConfig = GetColumnConfig(nameof(PacketDto.Channel));
+				var statusColumnConfig = GetColumnConfig(nameof(PacketDto.Status));
+				var parentIdColumnConfig = GetColumnConfig(nameof(PacketDto.ParentId));
+				var dataColumnConfig = GetColumnConfig(nameof(PacketDto.Data));
+				var retryCountColumnConfig = GetColumnConfig(nameof(PacketDto.RetryCount));
+				var dynamicFieldColumnConfig = GetColumnConfig(nameof(PacketDto.DynamicField));
+			}
+
+			<PropertyColumn Property="x => x.Packet.Id"
+							Title="@Localizer[nameof(PacketDto.Id)]"
+							Hidden="!(idColumnConfig.Visible)"
+							Format="@idColumnConfig.Format"
+							Sortable="true"
+							Filterable="true"
+							InitialDirection="GetSortDirectionFromString(idColumnConfig.SortDirection)"
+							CellStyle="@GetStyleFromWidth(idColumnConfig.Width)" />
+			<PropertyColumn Property="x => x.Packet.DateCreated"
+							Title="@Localizer[nameof(PacketDto.DateCreated)]"
+							Hidden="!(dateCreatedColumnConfig.Visible)"
+							Format="@dateCreatedColumnConfig.Format"
+							Sortable="true"
+							Filterable="true"
+							InitialDirection="GetSortDirectionFromString(dateCreatedColumnConfig.SortDirection)"
+							CellStyle="@GetStyleFromWidth(dateCreatedColumnConfig.Width)" />
+			<PropertyColumn Property="x => x.Packet.DateChanged"
+							Title="@Localizer[nameof(PacketDto.DateChanged)]"
+							Hidden="!(dateChangedColumnConfig.Visible)"
+							Format="@dateChangedColumnConfig.Format"
+							Sortable="true"
+							Filterable="true"
+							InitialDirection="GetSortDirectionFromString(dateChangedColumnConfig.SortDirection)"
+							CellStyle="@GetStyleFromWidth(dateChangedColumnConfig.Width)" />
+			<PropertyColumn Property="x => x.Packet.Channel"
+							Title="@Localizer[nameof(PacketDto.Channel)]"
+							Hidden="!(channelColumnConfig.Visible)"
+							Sortable="true"
+							Filterable="true"
+							InitialDirection="GetSortDirectionFromString(channelColumnConfig.SortDirection)"
+							CellStyle="@GetStyleFromWidth(channelColumnConfig.Width)" />
+			<PropertyColumn Property="x => x.Packet.ParentId"
+							Title="@Localizer[nameof(PacketDto.ParentId)]"
+							Hidden="!(parentIdColumnConfig.Visible)"
+							Format="@parentIdColumnConfig.Format"
+							Sortable="true"
+							Filterable="true"
+							InitialDirection="GetSortDirectionFromString(parentIdColumnConfig.SortDirection)"
+							CellStyle="@GetStyleFromWidth(parentIdColumnConfig.Width)" />
+			<PropertyColumn Property="x => x.Packet.RetryCount"
+							Title="@Localizer[nameof(PacketDto.RetryCount)]"
+							Hidden="!(retryCountColumnConfig.Visible)"
+							Format="@retryCountColumnConfig.Format"
+							Sortable="true"
+							Filterable="true"
+							InitialDirection="GetSortDirectionFromString(retryCountColumnConfig.SortDirection)"
+							CellStyle="@GetStyleFromWidth(retryCountColumnConfig.Width)" />
+			<PropertyColumn Property="x => x.Packet.Data"
+							Title="@Localizer[nameof(PacketDto.Data)]"
+							Hidden="!(dataColumnConfig.Visible)"
+							Sortable="true"
+							Filterable="true"
+							CellClass="pa-0"
+							InitialDirection="GetSortDirectionFromString(dataColumnConfig.SortDirection)"
+							CellStyle="@GetStyleFromWidth(dataColumnConfig.Width)">
+				<CellTemplate>
+					@if (context.Item.Packet is { } packet)
+					{
+						<div style="@(GetPacketDataStyle())">
+							<PacketData @key="packet.Id"
+										Packet="@packet"
+										DataDisplay="_dataDisplay"
+										OnOpenDataDialog="() => OpenDataDialog(packet)" />
+						</div>
+					}
+				</CellTemplate>
+			</PropertyColumn>
+			<PropertyColumn Property="x => x.Packet.DynamicField"
+							Title="@Localizer[nameof(PacketDto.DynamicField)]"
+							Hidden="!(dynamicFieldColumnConfig.Visible)"
+							Sortable="true"
+							Filterable="true"
+							InitialDirection="GetSortDirectionFromString(dynamicFieldColumnConfig.SortDirection)"
+							CellStyle="@GetStyleFromWidth(dynamicFieldColumnConfig.Width)" />
+			<PropertyColumn Property="x => x.Packet.Status"
+							Title="@Localizer[nameof(PacketDto.Status)]"
+							Hidden="!(statusColumnConfig.Visible)"
+							Sortable="true"
+							Filterable="true"
+							CellClass="pe-2 text-center"
+							InitialDirection="GetSortDirectionFromString(statusColumnConfig.SortDirection)"
+							CellStyle="@GetStyleFromWidth(statusColumnConfig.Width)">
+				<FilterTemplate>
+					@* <MudIconButton OnClick="OpenStatusFilter" Icon="@_icon" Size="Size.Small" /> *@
+					@* <MudOverlay Visible="@_isStatusFilterOpen" /> *@
+					<MudStack Spacing="0">
+						<MudCheckBox T="bool" Label="@Localizer["SelectAll"]" Size="@Size.Small" Checked="@_statusFilterSelectAll" CheckedChanged="@SelectAllStatusFilters" />
+						<MudStack Spacing="0" Style="overflow-y:auto;max-height:250px">
+							@foreach (var status in PacketHelper.Statuses)
+							{
+								<div style="display:flex; justify-content: space-between; align-items:center; gap: 5px">
+									<MudCheckBox T="bool"
+												 Label="@Localizer[$"{status}"]"
+												 Size="@Size.Small"
+												 Checked="@(_selectedStatuses.Contains(status))"
+												 CheckedChanged="@((value) => StatusFilterSelectedChanged(value, status))" />
+									<MudIcon Icon="@GetStatusIcon(status)" Color="GetStatusIconColor(status)" Size="Size.Small" />
+								</div>
+							}
+						</MudStack>
+						<MudStack Row="true">
+							<MudButton OnClick="@(() => ClearStatusFilterAsync(context))">@Localizer["Clear"]</MudButton>
+							<MudButton Color="@Color.Primary" OnClick=@(() => ApplyStatusFilterAsync(context))>@Localizer["Filter"]</MudButton>
+						</MudStack>
+					</MudStack>
+				</FilterTemplate>
+				<CellTemplate>
+					@if (context.Item.Packet is { } packet)
+					{
+						<MudTooltip Text="@Localizer[$"{packet.Status}"]">
+							@if (packet.Status == PacketStatus.FatalError && _isAdministrator && !IsExportViewerMode && packet.CanResend)
+							{
+								<MudButton StartIcon="@Icons.Material.Rounded.Error"
+										   IconColor="Color.Error"
+										   OnClick="@(() => HandleResendClick(packet))"
+										   Tag="packet">
+									@Localizer["Resend"]
+								</MudButton>
+							}
+							else
+							{
+								<MudIcon Icon="@GetStatusIcon(packet.Status)" Color="GetStatusIconColor(packet.Status)" Size="Size.Small" />
+							}
+						</MudTooltip>
+					}
+				</CellTemplate>
+			</PropertyColumn>
+		</Columns>
+
+		<ChildRowContent>
+			@if (context.Item.ShowChildContent)
+			{
+				<ChildPacketGrid Packets="Packets"
+								 SelectedPackets="SelectedPackets"
+								 GetPacketRowStyle="GetPacketRowStyle"
+								 GetPacketDataStyle="GetPacketDataStyle"
+								 GetColumnConfig="GetColumnConfig"
+								 GetStyleFromWidth="GetStyleFromWidth"
+								 DataDisplay="_dataDisplay"
+								 IsExportViewerMode="IsExportViewerMode"
+								 ParentId="context.Item.Packet.Id"
+								 IsAdministrator="_isAdministrator"
+								 OnPacketResendClick="packet => OnPacketResendClick?.Invoke(packet)"
+								 OnPacketRowClick="packet => OnPacketRowClick?.Invoke(packet)"
+								 OnOpenDataDialog="async packet => await OpenDataDialog(packet)" />
+			}
+		</ChildRowContent>
+		<PagerContent>
+			@if (!LiveMode)
+			{
+				<div style="display: flex; align-items: center; justify-content: flex-end;">
+					<div Class="no-flex-grow">
+						<MudAutocomplete T="int"
+										 Label="Rows per page" @bind-Value="RowsPerPage"
+										 SearchFunc="@SearchRowsPerPage"
+										 ResetValueOnEmptyText="true"
+										 CoerceValue="true"
+										 CoerceText="false"  />
+					</div>
+					<MudProgressCircular Color="Color.Info" Size="Size.Small" Indeterminate="@FilterRunning" />
+					<MudIconButton Color="Color.Primary"
+								   Icon="@(FilterRunning ? Icons.Material.Filled.Pause : Icons.Material.Filled.PlayArrow)"
+								   Size="Size.Small"
+								   Title="@Localizer[FilterRunning ? "StopSendingPackets" : "StartSendingPackets"]"
+								   OnClick="HandleFilterRunnerStateChanged" 
+								   Style="margin-left: 10px" />
+					<MudDataGridPager T="PacketGridRow" DisableRowsPerPage="true" InfoFormat="Packets {first_item}-{last_item} of {all_items} Total Packets" />
+				</div>
+			}
+		</PagerContent>
+	</MudDataGrid>
+</div>

@@ -1,0 +1,248 @@
+@using System.Text;
+@using eHub.Contracts
+@using eHub.PlugIn.UI;
+@using eController.WebUI.Utility.DynamicComponent
+@using eHub.UI.Common
+@using eHub.Contracts.UIConfig;
+@inherits FrameworkComponent
+
+<div class="history-container">
+
+    <MudDrawerContainer Style="height: calc(100vh - 128px)" Class="pt-8">
+
+        <HistorySidePanel @ref="_historySidePanel" SelectedConnector="_selectedIdentifier" SelectedConnectorChanged="OnSelectedConnectorChanged" />
+
+        <MudPaper Square="true"
+        Width="100%"
+        Height="32px"
+        Elevation="0"
+        Class="mud-theme-primary absolute ma-0"
+        Style="left: 0px; top: 64px; padding-left: var(--mud-drawer-width-mini-left)">
+            <MudText Typo="Typo.h6">
+                @(_isExportViewerMode ? Localizer["ExportViewer"] : _selectedIdentifier?.ConnectorKey)
+            </MudText>
+        </MudPaper>
+
+        @if (!ConnectorRegistry.ActiveConnectors.Any())
+        {
+            <MudPaper Elevation="0" Width="400px" Class="pt-4">
+                <MudCard Outlined="true">
+                    <MudCardContent Class="pb-0">
+                        <MudText Typo="Typo.h6">@Localizer["ConnectorsNotFoundTitle"]</MudText>
+                        <MudText>@Localizer["ConnectorsNotFoundDescription"]</MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Text"
+                        Style="text-transform: uppercase"
+                        Color="Color.Primary"
+                        OnClick="@(() => NavigationManager.NavigateTo("eHubManager"))">
+                            @Localizer["CheckConnectorsStatus"]
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudPaper>
+
+            return;
+        }
+
+        @if ((!_isExportViewerMode ? _selectedIdentifier : JsonViewerIdentifier) is { } selectedIdentifier)
+        {
+            var connectorScope = _connectorsScopedContexts[selectedIdentifier];
+            var uiViewConfig = connectorScope.GetUIViewConfig();
+            var filters = connectorScope.FilterOptions.ColumnFilters;
+
+            <MudTabs @ref="_tabs"
+            Rounded="true"
+            ApplyEffectsToContainer="true"
+            ActivePanelIndex="_selectedViewIndex"
+            ActivePanelIndexChanged="@SelectedViewChanged">
+                @foreach (var view in uiViewConfig.Views)
+                {
+                    var tabName = view.Value.DisplayName?.GetValueOrDefault(_currentCulture.Name) ?? view.Value.Name;
+                    <MudTabPanel Text="@tabName" Tag="@view.Key" />
+                }
+            </MudTabs>
+
+            <div class="d-flex gap-1 my-3">
+                <MudButton Variant="Variant.Filled"
+                StartIcon="@Icons.Material.Filled.DateRange"
+                Size="Size.Large"
+                Color="Color.Primary"
+                OnClick="OpenPacketFilterDialog"
+                Class="rounded-pill">
+                    @Localizer["Filter"]
+                </MudButton>
+
+                @if (_isExportViewerMode)
+                {
+                    <MudButton Variant="Variant.Filled"
+                    StartIcon="@Icons.Material.Filled.Search"
+                    EndIcon="@Icons.Material.Filled.Close"
+                    Size="Size.Large"
+                    Color="Color.Primary"
+                    OnClick="CloseJsonViewFile"
+                    Class="rounded-pill">
+                        @Localizer["ExitExportViewer"]
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled"
+                    StartIcon="@Icons.Material.Filled.DirectionsRun"
+                    Size="Size.Large"
+                    Color="Color.Primary"
+                    OnClick="OpenActionDialog"
+                    Class="rounded-pill">
+                        @Localizer["Action"]
+                    </MudButton>
+                }
+
+                <MudButton Variant="Variant.Filled"
+                StartIcon="@Icons.Material.Filled.FormatListNumbered"
+                Size="Size.Large"
+                Color="Color.Primary"
+                Disabled="@(!_isAdministrator || connectorScope.Packets.Count == 0 || _isExportViewerMode)"
+                OnClick="OpenSequenceDialog"
+                Class="rounded-pill">
+                    @Localizer["Sequence"]
+                </MudButton>
+
+                <MudSwitch Label="@Localizer[_liveMode ? "LiveMode" : "OfflineMode"]"
+                Checked="@_liveMode"
+                T="bool"
+                CheckedChanged="ModeChanged"
+                ThumbIcon="@(_liveMode==true ? Icons.Material.Filled.Refresh : Icons.Material.Filled.Close)"
+                ThumbIconColor="@(_liveMode==true ? Color.Success : Color.Secondary)"
+                Disabled="_isExportViewerMode"
+                Class="ms-2">
+                </MudSwitch>
+
+                <MudSwitch Label="@Localizer["GroupPackets"]"
+                @bind-Checked="@_groupPackets"
+                ThumbIcon="@(_groupPackets==true ? Icons.Material.Filled.FormatAlignRight : Icons.Material.Filled.FormatAlignJustify)"
+                Disabled="_isExportViewerMode"
+                Class="ms-2">
+                </MudSwitch>
+
+                @if (_tabs?.ActivePanel.Tag is string selectedView && uiViewConfig.Views.TryGetValue(selectedView, out var view))
+                {
+                    @if (view.Channels.Select(c => (c.Position.RowIndex, c.Position.ColIndex)).Distinct().Count() >= 2)
+                    {
+                        <MudSwitch Label="@Localizer["LockScroll"]"
+                        @bind-Checked="@_lockScroll"
+                        ThumbIcon="@(_lockScroll == true ? Icons.Material.Outlined.Lock : Icons.Material.Filled.LockOpen)"
+                        ThumbIconColor="@(_lockScroll == true ? Color.Warning : Color.Error)"
+                        Class="ms-2">
+                        </MudSwitch>
+                    }
+                }
+            </div>
+
+            @if (filters.Length > 0)
+            {
+                <MudChipSet AllClosable="@true" OnClose="RemoveColumnFilter">
+                    @for(var i = 0; i < filters.Length; i++)
+                    {
+                        var filter = filters[i];
+                        <MudChip Value="filter">@filter.ToString()</MudChip>
+                    }
+                </MudChipSet>
+            }
+
+            @if (_tabs?.ActivePanel.Tag is string viewName && uiViewConfig.Views.TryGetValue(viewName, out view))
+            {
+                static string GenerateFrs(int cnt) => new StringBuilder(cnt * 4).Insert(0, " 1fr", cnt).ToString();
+                static string Generate(IEnumerable<int> e) => e.Any() ? GenerateFrs(Math.Max(1, e.Max() - e.Min() + 1)) : "auto";
+                var rowTemplate = Generate(view.Channels.Select(c => c.Position.RowIndex));
+                var colTemplate = Generate(view.Channels.Select(c => c.Position.ColIndex));
+
+                var rowIndexCount = view.Channels.Select(c => c.Position.RowIndex).ToHashSet().Count;
+
+                // Temporary fix for the filter tags height calculation
+                var baseWidth = _windowWidth - (_historySidePanel?.Open == true ? 240 : 56) - 48;
+                var numberOfRows = 0;
+
+                if (filters.Length > 0)
+                {
+                    numberOfRows++;
+                    var filledWidth = baseWidth;
+                    foreach (var filter in filters)
+                    {
+                        var tagWidth = filter.ToString().Length * 7 + 40;
+                        filledWidth -= tagWidth;
+
+                        if (filledWidth < 0)
+                        {
+                            numberOfRows++;
+                            filledWidth = baseWidth - tagWidth; 
+                        }
+                    }
+                }
+
+                var filterTagsHeight = numberOfRows * 40;
+
+                var heightTemplate = $"calc((100vh - 226px - {filterTagsHeight}px)/{rowIndexCount})";
+
+                <div class="grids-container" style="@($"grid-template-rows:{rowTemplate}; grid-template-columns:{colTemplate};")">
+                    @foreach (var channel in view.Channels.GroupBy(c => c.Position))
+                    {
+                        var packets = channel
+                        .SelectMany(c =>
+                        {
+                            var key = new PacketGroupIdentifier(c.Connector, c.Channel);
+                            if (connectorScope.GroupedPackets.TryGetValue(key, out var packetSet))
+                            {
+                                return packetSet.Select(p => p with { Channel = c.Name });
+                            }
+
+                            return Enumerable.Empty<PacketDto>();
+                        })
+                        .OrderByDescending(x => x.Id)
+                        .ToList();
+
+                        var groupName = string.Join(", ", channel.Select(c =>
+                        {
+                            var name = c.DisplayName?.GetValueOrDefault(_currentCulture.Name) ?? c.Name;
+                            return name;
+                        }).Distinct());
+
+                        var channelDataDisplay = channel.FirstOrDefault()?.DataDisplay;
+
+                        var dataDisplayFormat = channelDataDisplay?.Format
+                        ?? view.DataDisplay.Format
+                        ?? PlugIn.UI.DisplayFormat.SingleLine;
+                        var dataRowCount = channelDataDisplay?.RowCount
+                        ?? view.DataDisplay.RowCount;
+
+                        var columnsConfig = GetColumnsConfig();
+
+                        <div class="channel-item" style="@($"grid-column: {channel.Key.ColIndex}; grid-row: {channel.Key.RowIndex};")">
+                            <PacketGrid @ref="PacketGridRef"
+                                        @key="channel.Key"
+                                        Title="@groupName"
+                                        Packets="packets"
+                                        SelectedPackets="_selectedPackets"
+                                        ShowChannelColumn="@(channel.Count() > 1)"
+                                        GroupPackets="_groupPackets"
+                                        Loading="_loading"
+                                        LockScroll="_lockScroll"
+                                        IsExportViewerMode="_isExportViewerMode"
+                                        Columns="columnsConfig"
+                                        DataDisplayFormat="dataDisplayFormat"
+                                        DataRowCount="dataRowCount"
+                                        ViewPacketCount="uiViewConfig.ViewPacketCount"
+                                        LiveMode="_liveMode"
+                                        FilterRunning="connectorScope.IsFilterRunning"
+                                        Height="@heightTemplate"
+                                        OnPacketResendClick="async x => await HandlePacketResendClick(x)"
+                                        OnPacketRowClick="x => HandlePacketRowClick(x)"
+                                        OnFilterRunnerStopped="async () => await HandleFilterRunnerStopped()"
+                                        OnFilterRunnerStarted="async () => await HandleFilterRunnerStarted()"
+                                        OnGridScroll="async(sender, eventArgs) => await HandlePacketGridScroll(sender!, eventArgs)" />
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </MudDrawerContainer>
+</div>

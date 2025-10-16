@@ -1,0 +1,142 @@
+{
+    "ViewPacketCount": 5,
+    "Views": {
+        "View1": {
+            "Name": "All",
+            "DisplayName": {
+                "en": "All",
+                "de": "Alle"
+            },
+            "Channels": [
+                {
+                    "Name": "D01 -> D02 Data",
+                    "DisplayName": {
+                        "en": "D01 -> D02 Data",
+                        "de": "D01 -> D02 Daten"
+                    },
+                    "DataDisplay": {
+                        "Format": "Dialog"
+                    },
+                    "Channel": "Device01ToDevice02_Data",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 1
+                    }
+                },
+                {
+                    "Name": "D02 -> D01 Data",
+                    "DisplayName": {
+                        "en": "D02 -> D01 Data",
+                        "de": "D02 -> D01 Daten"
+                    },
+                    "Channel": "Device02ToDevice01_Data",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 1
+                    }
+                },
+                {
+                    "Name": "Errors",
+                    "DisplayName": {
+                        "en": "Errors",
+                        "de": "Errors"
+                    },
+                    "Channel": "Device01ToDevice02_Data:Error",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 1
+                    }
+                },
+                {
+                    "Name": "Ack",
+                    "DisplayName": {
+                        "en": "Ack",
+                        "de": "Ack"
+                    },
+                    "Channel": "Device01ToDevice02_Ack",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 1
+                    }
+                }
+            ]
+        },
+        "View2": {
+            "Name": "Without Ack",
+            "DisplayName": {
+                "en": "Without Ack",
+                "de": "Ohne Ack"
+            },
+            "Channels": [
+                {
+                    "Name": "D01 -> D02 Data",
+                    "DisplayName": {
+                        "en": "D01 -> D02 Data",
+                        "de": "D01 -> D02 Daten"
+                    },
+                    "Channel": "Device01ToDevice02_Data",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 1
+                    }
+                },
+                {
+                    "Name": "D02 -> D01 Data",
+                    "DisplayName": {
+                        "en": "D02 -> D01 Data",
+                        "de": "D02 -> D01 Daten"
+                    },
+                    "Channel": "Device02ToDevice01_Data",
+                    "Position": {
+                        "RowIndex": 2,
+                        "ColIndex": 1
+                    }
+                }
+            ]
+        },
+        "View3": {
+            "Name": "Only Sender",
+            "DisplayName": {
+                "en": "Only Sender",
+                "de": "Nur Sender"
+            },
+            "Connectors": [ "Device01" ],
+            "Channels": [
+                {
+                    "Name": "D01 -> D02 Data",
+                    "DisplayName": {
+                        "en": "D01 -> D02 Data",
+                        "de": "D01 -> D02 Daten"
+                    },
+                    "Channel": "Device01ToDevice02_Data",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 1
+                    }
+                }
+            ]
+        },
+        "View4": {
+            "Name": "Only Receiver",
+            "DisplayName": {
+                "en": "Only Receiver",
+                "de": "Nur Empfänger"
+            },
+            "Connectors": [ "Device02" ],
+            "Channels": [
+                {
+                    "Name": "D02 -> D01 Data",
+                    "DisplayName": {
+                        "en": "D02 -> D01 Data",
+                        "de": "D02 -> D01 Daten"
+                    },
+                    "Channel": "Device02ToDevice01_Data",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 1
+                    }
+                }
+            ]
+        }
+    }
+}

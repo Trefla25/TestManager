@@ -1,0 +1,56 @@
+@page "/controllers"
+@using MudBlazor
+
+@if (_controllerRouteModels is null && _loading is false)
+{
+    <div>
+        <MudAlert Severity="Severity.Error">@Localizer["ErrorNoResponseHost"]: @_lastErrorMessage</MudAlert>
+        <ElDivider Style="margin-bottom: 0.5%; margin-top: 0.15%" />
+    </div>
+    return;
+}
+else if (_controllerRouteModels is null && _loading is true)
+{
+    <div>
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-7" />
+        <MudProgressLinear Color="Color.Secondary" Indeterminate="true" Class="my-7" />
+    </div>
+    return;
+}
+else if (!_controllerRouteModels!.Any())
+{
+    <div>
+        <MudAlert Severity="Severity.Info">@Localizer["ErrorNoController"]</MudAlert>
+        <ElDivider Style="margin-bottom: 0.5%; margin-top: 0.15%" />
+    </div>
+    return;
+}
+
+<div>
+    <MudDataGrid Items="@_controllerRouteModels" Height="calc(75vh-0px)" Style="position: relative; width:82vw" Outlined="false" Elevation="0">
+        <Columns>
+            <PropertyColumn Property="x => x.ControllerName" />
+            <PropertyColumn Property="x => x.ActionName" />
+            <TemplateColumn Context="context">
+                <CellTemplate>
+                    <ElText @onclick="() => CopyRouteToClipboard(context.Item.Template)" Style=" cursor: pointer !important;"
+                            Color="Color.Info">@context.Item.Template</ElText>
+                </CellTemplate>
+                <HeaderTemplate>
+                    @Localizer["Route"]
+                </HeaderTemplate>
+            </TemplateColumn>
+            <TemplateColumn Context="context">
+                <CellTemplate>
+                    <ElText><b>@JoinVerbs(context.Item)</b></ElText>
+                </CellTemplate>
+                <HeaderTemplate>
+                    @Localizer["Type"]
+                </HeaderTemplate>
+            </TemplateColumn>
+
+            <PropertyColumn Property="x => x.DisplayName" />
+
+        </Columns>
+    </MudDataGrid>
+</div>

@@ -1,0 +1,35 @@
+{
+  "ConnectorMsg": {
+    "Type": "MessengerStuff",
+    "Enabled": false,
+    "Config": {}
+  },
+  "UpdateStatusConnector": {
+    "Type": "eController.IntegrationHub.Scripts2.UpdateStatusConnector",
+    "Enabled": false,
+    "Config": {}
+  },
+  "TransferBogus": {
+    "Type": "eController.IntegrationHub.Scripts2.PacketTransferBogus",
+    "Enabled": true,
+    "Config": {
+      "PushWind": true,
+      "PushTemp": true
+    },
+    "PacketTransfer": {
+      "ChannelGroups": {
+        "Wind": {
+          "Channels": [
+            "Wind"
+          ]
+        },
+        "Temp": {
+          "Channels": [
+            "Temp"
+          ],
+          "CleanerInterval": "1h"
+        }
+      }
+    }
+  }
+}

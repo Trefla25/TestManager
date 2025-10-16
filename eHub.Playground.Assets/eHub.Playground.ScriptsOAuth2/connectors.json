@@ -1,0 +1,52 @@
+{
+  "OAuthConnector": {
+    "Type": "OAuthConnector",
+    "Enabled": true,
+    "Api": {
+      "OAuth2": {
+        "Authorization": {
+          "Type": "OAuth2",
+          "OAuth2": {
+            "GrantType": "client_credentials",
+            "ClientId": "89a93f20-d398-403b-baa4-44f7e1ed6f5b",
+            "ClientSecret": "vHkJpmF3c6cyUXojUgPOAX2grH64J2ur",
+            "AccessTokenUrl": "https://kc.aks.devpoc.eltest.no/realms/econtroller-test/protocol/openid-connect/token"
+          }
+        },
+        "BaseAddress": "http://localhost:5202"
+      },
+      "BearerToken": {
+        "Authorization": {
+          "Type": "BearerToken",
+          "BearerToken": {
+            "ContentType": "FormUrlEncoded",
+            "Parameters": {
+              "grant_type": "client_credentials",
+              "client_id": "89a93f20-d398-403b-baa4-44f7e1ed6f5b",
+              "client_secret": "vHkJpmF3c6cyUXojUgPOAX2grH64J2ur"
+            },
+            "AccessTokenUrl": "https://kc.aks.devpoc.eltest.no/realms/econtroller-test/protocol/openid-connect/token"
+          }
+        },
+        "BaseAddress": "http://localhost:5202"
+      },
+      "Basic": {
+        "Authorization": {
+          "Type": "Basic",
+          "Basic": {
+            "Username": "user",
+            "Password": "user123"
+          }
+        },
+        "BaseAddress": "http://localhost:5138"
+      }
+    },
+    "PacketTransfer": {
+      "DbPath": "C:\\Work\\Databases\\OAuth.db",
+      "ChannelGroups": {}
+    },
+    "Config": {
+      "UrlEndpoint": "Test"
+    }
+  }
+}

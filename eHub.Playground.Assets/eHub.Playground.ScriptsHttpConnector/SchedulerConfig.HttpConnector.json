@@ -1,0 +1,14 @@
+[
+    {
+        "Id": 2,
+        "AssemblyName": "eController.IntegrationHub.ScriptsHttpConnector",
+        "ClassName": "ScheduledTest",
+        "CronExpression": "0/5 * * ? * *",
+        "Enabled": true,
+        "Title": "Task Test",
+        "StartDate": null,
+        "EndDate": null,
+        "DynamicField": null,
+        "Category": null
+    }
+]

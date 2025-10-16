@@ -1,0 +1,63 @@
+﻿@using eController.WebUI.Utility.DynamicComponent
+@inherits FrameworkComponent
+
+<MudDrawer @bind-Open="@Open" ClipMode="DrawerClipMode.Always" Elevation="0" Variant="@DrawerVariant.Mini" Color="Color.Primary" OpenMiniOnHover="true">
+    @if (Open)
+    {
+        <div style="justify-content: space-between;" class="d-flex">
+            <MudText Typo="Typo.h6" Class="ps-4 mt-auto mb-auto">@Localizer["Connectors"]</MudText>
+            <MudToggleIconButton @bind-Toggled="@_pin"
+                                 Icon="@Icons.Material.Outlined.PushPin" Color="Color.Inherit"
+                                 ToggledIcon="@Icons.Material.Filled.PushPin" ToggledColor="Color.Inherit" />
+        </div>
+
+    }
+    <MudNavMenu>
+        @if (Open)
+        {
+            foreach (var group in _groupedConnectors)
+            {
+                <MudCard @key="@group" Elevation="0" Outlined=true Class="mx-2 mb-2" Style="background-color: transparent;">
+                    <MudCardHeader Class="pa-1" Style="color:var(--mud-palette-white)">
+                        @group.Key.Split('.').LastOrDefault()
+                    </MudCardHeader>
+                    <MudCardContent Class="pa-0">
+                        @foreach (var connectorState in group.Connectors)
+                        {
+                            var styles = connectorState.Ident == SelectedConnector ?
+                            "background-color:#9b9b9b54;color:var(--mud-palette-white)" :
+                            "color:var(--mud-palette-white)";
+
+                            <MudNavLink key="@connectorState"
+                                        Match="NavLinkMatch.All"
+                                        Icon="@Icons.Material.Filled.LabelImportant"
+                                        IconColor="Color.Surface"
+                                        Style="@styles"
+                                        OnClick="() => SelectConnectorState(connectorState.Ident)">
+                                @connectorState.Ui.ConnectorName
+                            </MudNavLink>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            }
+        }
+        else
+        {
+            foreach (var connectorState in _groupedConnectors.SelectMany(x => x.Connectors))
+            {
+                var styles = connectorState.Ident == SelectedConnector ?
+                "background-color:#9b9b9b54" :
+                "";
+
+                <MudNavLink @key="connectorState"
+                            Match="NavLinkMatch.All"
+                            Icon="@Icons.Material.Filled.LabelImportant"
+                            IconColor="Color.Surface"
+                            Style="@styles"
+                            OnClick="() => SelectConnectorState(connectorState.Ident)">
+                    @connectorState.Ui.ConnectorName
+                </MudNavLink>
+            }
+        }
+    </MudNavMenu>
+</MudDrawer>

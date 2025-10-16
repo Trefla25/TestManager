@@ -1,0 +1,129 @@
+@using MudBlazor
+
+@if (_connectorsSummaries is null && _loading is false)
+{
+    <div>
+        <MudAlert Severity="Severity.Error">@Localizer["ErrorNoResponseHost"]: @_lastErrorMessage</MudAlert>
+        <ElDivider Style="margin-bottom: 0.5%; margin-top: 0.15%" />
+    </div>
+    return;
+
+}
+else if (_connectorsSummaries is null && _loading is true)
+{
+    <div>
+        <ElProgressCircular Indeterminate="true" Class="my-7"></ElProgressCircular>
+    </div>
+    return;
+}
+else if (!_connectorsSummaries!.AllConnectorTemplates.Any())
+{
+    <div>
+        <MudAlert Severity="Severity.Success">@Localizer["ErrorNoConnector"]</MudAlert>
+        <ElDivider Style="margin-bottom: 0.5%; margin-top: 0.15%" />
+    </div>
+    return;
+}
+
+<div>
+    @if (_connectorsSummaries?.AllConnectorTemplates.Count() > 0)
+    {
+        <MudDataGrid Items="@_connectorsSummaries.AllConnectorTemplates" Height="calc(75vh-0px)" Style="position: relative; width:82vw" Outlined="false" Elevation="0">
+            <Columns>
+                <TemplateColumn Filterable=false Sortable=false Context="context">
+                    <CellTemplate>
+                        @{
+                            var status = GetStatusByTemplateName(context.Item.TemplateName);
+
+                            switch (status)
+                            {
+                                case "Running":
+                                    {
+                                        <ElText><b>@Localizer["Running"]</b></ElText>
+                                        break;
+                                    }
+
+                                case "Not running":
+                                    {
+                                        <ElText><b>@Localizer["Not running"]</b></ElText>
+                                        break;
+                                    }
+
+                                default:
+                                    {
+                                        break;
+                                    }
+                            }
+                        }
+
+                    </CellTemplate>
+                    <HeaderTemplate>
+                        @Localizer["Status"]
+                    </HeaderTemplate>
+                </TemplateColumn>
+
+                <TemplateColumn Filterable=false Sortable=false Context="context">
+                    <CellTemplate>
+                        @{
+                            var targetConnector = _connectorsSummaries.ConnectorStatus
+                            .Where(x => x.ConnectorName == context.Item.TemplateName)
+                            .FirstOrDefault();
+
+                            if (targetConnector is null)
+                            {
+                                <ElText>No status found</ElText>
+                                return;
+                            }
+
+                            <div>
+                                @foreach (var statusPair in targetConnector.StatusDictionary)
+                                {
+                                    <ElChip Size="Size.Small">@statusPair.Key : @statusPair.Value</ElChip><br />
+                                }
+                            </div>
+                        }
+                    </CellTemplate>
+                    <HeaderTemplate>
+                        Connector Data Infos
+                    </HeaderTemplate>
+                </TemplateColumn>
+
+                <PropertyColumn Property="x => x.TemplateName" />
+                <PropertyColumn Property="x => x.ConnectorType" />
+                <TemplateColumn Context="context">
+                    <CellTemplate>
+                        @GetScriptFileByTemplateName(context.Item.TemplateName)
+                    </CellTemplate>
+                    <HeaderTemplate>
+                        @Localizer["Module Name"]
+                    </HeaderTemplate>
+                </TemplateColumn>
+
+                <AuthorizeView Roles="Administrator">
+                    <Authorized>
+                        <TemplateColumn StickyRight=true Filterable=false Sortable=false Context="context2">
+                            <CellTemplate>
+                                <div style="display: flex; justify-content: center; align-items: center;">
+                                    @if (!IsConnectorRunning(context2.Item.TemplateName))
+                                    {
+                                        <ElIconButton Color="@ElColor.Success" OnClick="() => StartConnector(context2.Item.TemplateName)"
+                                                      Title=@Localizer["Start"] Icon="@Icons.Material.Rounded.PlayArrow"></ElIconButton>
+                                    }
+                                    else
+                                    {
+                                        <ElIconButton Color="@ElColor.Error" OnClick="() => StopConnector(context2.Item.TemplateName)"
+                                                      Title=@Localizer["Stop"] Icon="@Icons.Material.Rounded.Stop"></ElIconButton>
+                                    }
+                                </div>
+
+                            </CellTemplate>
+                            <HeaderTemplate>
+                                @Localizer["Operations"]
+                            </HeaderTemplate>
+                        </TemplateColumn>
+                    </Authorized>
+                </AuthorizeView>
+            </Columns>
+        </MudDataGrid>
+    }
+</div>

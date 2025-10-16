@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+    "profiles": {
+        "eHub [Dev]": {
+            "commandName": "Project",
+            "launchBrowser": true,
+            "environmentVariables": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            },
+            "commandLineArgs": "--econfig-root=./econfig_root --econfig-displayname=EHUB_Dev"
+        },
+
+        "eHub [Container]": {
+            "commandName": "Project",
+            "launchBrowser": true,
+            "launchUrl": "",
+            "environmentVariables": {
+                "ASPNETCORE_ENVIRONMENT": "Container"
+            },
+            "commandLineArgs": "--econfig-root=./econfig_root --econfig-displayname=EHUB_Container"
+        }
+    }
+}

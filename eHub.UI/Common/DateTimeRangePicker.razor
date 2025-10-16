@@ -1,0 +1,35 @@
+@using eController.WebUI.Utility.DynamicComponent
+@inherits FrameworkComponent
+
+<MudCard Outlined="true" Class="mb-2">
+    <MudCardContent>
+        <MudGrid Style="width:500px;" Spacing="1">
+            <MudItem xs="7">
+                <MudDatePicker Label="@Localizer["DateStart"]" 
+                               Date="Start.Date" 
+                               DateChanged="OnStartDateChanged" 
+                               Editable="true"
+                               DateFormat="dd.MM.yyyy" />
+            </MudItem>
+            <MudItem xs="5">
+                <MudTimePicker Label="@Localizer["TimeStart"]" 
+                               Time="Start.TimeOfDay" 
+                               Editable="true"
+                               TimeChanged="OnStartTimeChanged" />
+            </MudItem>
+            <MudItem xs="7">
+                <MudDatePicker Label="@Localizer["DateEnd"]" 
+                               Date="End.Date" 
+                               DateChanged="OnEndDateChanged" 
+                               Editable="true"
+                               DateFormat="dd.MM.yyyy" />
+            </MudItem>
+            <MudItem xs="5">
+                <MudTimePicker Label="@Localizer["TimeEnd"]" 
+                               Time="End.TimeOfDay" 
+                               Editable="true"
+                               TimeChanged="OnEndTimeChanged" />
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <OutputType>Library</OutputType>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <eUtilFeatures>$(eUtilFeatures),CollectionUtil</eUtilFeatures>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="eController.Util.Embed">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="eController.WebUI.PlugIn" />
+        <PackageReference Include="eController.WebUI.Utility" />
+        <PackageReference Include="ElUI.ComponentLib" />
+        <PackageReference Include="eMessenger" />
+        <PackageReference Include="ePlugin.MsBuild">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\eHub.Contracts\eHub.Contracts.csproj" />
+    </ItemGroup>
+</Project>

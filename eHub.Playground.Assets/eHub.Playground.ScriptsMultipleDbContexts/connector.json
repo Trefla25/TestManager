@@ -1,0 +1,19 @@
+{
+  "MyConnector": {
+    "Type": "MyConnector",
+    "Enabled": true,
+    "PacketTransfer": {
+      "DbPath": "C:\\Work\\Databases\\MultipleContext\\Test.db",
+      "ChannelGroups": {
+        "All": {
+          "DbPollInterval": "1s",
+          "PacketsPerCycle": 1,
+          "PacketRetention": "30d",
+          "CleanerInterval": "1h",
+          "Channels": [ "channel" ]
+        }
+      }
+    },
+    "Config": { }
+  }
+}

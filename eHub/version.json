@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/main/src/NerdBank.GitVersioning/version.schema.json",
+  "version": "4.5.0",
+  "publicReleaseRefSpec": [
+    "^refs/heads/(master|main|\\w+-force-deploy)$"
+  ],
+  "release": {
+    "tagName": "ehub/v{version}",
+    "branchName": "ehub/v{version}",
+    "firstUnstableTag": "dev"
+  },
+  "pathFilters": [
+    "/eHub",
+    "/eHub.Contracts",
+    "/eHub.Manager",
+    "/eHub.PlugIn",
+    "/eHub.UI",
+    "/eController.WebUI.Library",
+    "/eController.WebUI.PlugIn",
+    "/eController.WebUI.Utility",
+    "/ElementLogic.Configuration",
+    "/eMessenger",
+    "/ePlugin.Engine"
+  ]
+}

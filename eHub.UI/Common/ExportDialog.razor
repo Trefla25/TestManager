@@ -1,0 +1,29 @@
+﻿@using eController.WebUI.Utility.DynamicComponent
+@inherits FrameworkComponent
+
+<MudDialog ClassContent="py-0">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Download" Class="mr-3" />
+            @Localizer["ExportOptions"]
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <DateTimeRangePicker @bind-Start="StartDateTime" @bind-End="EndDateTime" />
+        <MudCard Outlined="true">
+            <MudCardContent>
+                <MudSelect T="string" Label="@Localizer["Channels"]" MultiSelection="true" @bind-SelectedValues="_selectedChannels" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (var channel in Channels)
+                    {
+                        <MudSelectItem T="string" Value="@channel">@channel</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="title" Label="@Localizer["FileName"]" Variant="Variant.Text"></MudTextField>
+            </MudCardContent>
+        </MudCard>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@Localizer["Cancel"]</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Export">@Localizer["Export"]</MudButton>
+    </DialogActions>
+</MudDialog>

@@ -1,0 +1,54 @@
+{
+    "Name": "Combined",
+    "Connectors": [
+        "HttpConnector",
+        "Device01"
+    ],
+    "Views": {
+        "Combined": {
+            "Name": "All",
+            "DisplayName": {
+                "en": "All",
+                "de": "All"
+            },
+            "Channels": [
+                {
+                    "Name": "Http Incoming",
+                    "DataDisplay": {
+                        "Format": "Dialog"
+                    },
+                    "Connector": "HttpConnector",
+                    "Channel": "eHubToEManager",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 1
+                    }
+                },
+                {
+                    "Name": "Device01 Incoming",
+                    "DataDisplay": {
+                        "Format": "Dialog"
+                    },
+                    "Connector": "Device01",
+                    "Channel": "Device01ToDevice02_Data",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 1
+                    }
+                },
+                {
+                    "Name": "Http Outgoing",
+                    "DataDisplay": {
+                        "Format": "Dialog"
+                    },
+                    "Connector": "HttpConnector",
+                    "Channel": "eManagerToEHub",
+                    "Position": {
+                        "RowIndex": 1,
+                        "ColIndex": 2
+                    }
+                }
+            ]
+        }
+    }
+}

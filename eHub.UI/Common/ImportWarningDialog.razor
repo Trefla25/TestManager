@@ -1,0 +1,18 @@
+﻿@using eController.WebUI.Utility.DynamicComponent
+@inherits FrameworkComponent
+
+<MudDialog>
+	<TitleContent>
+		<MudText Typo="Typo.h6">
+			<MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-3 mb-1" />
+			@Localizer["Warning"].Value.ToUpper()
+		</MudText>
+	</TitleContent>
+	<DialogContent>
+		@Localizer["ImportWarningMessage"]
+	</DialogContent>
+	<DialogActions>
+		<MudButton OnClick="Cancel">@Localizer["Cancel"]</MudButton>
+		<MudButton Color="Color.Warning" OnClick="Submit">@Localizer["Continue"]</MudButton>
+	</DialogActions>
+</MudDialog>

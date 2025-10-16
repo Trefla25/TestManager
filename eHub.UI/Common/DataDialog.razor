@@ -1,0 +1,50 @@
+@using eController.WebUI.Utility.DynamicComponent
+@inherits FrameworkComponent
+
+<MudDialog ClassContent="py-0" ContentStyle="padding: 0!important;">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@MudDialog.Title</MudText>
+        <MudIconButton OnClick="ToggleFullscreen" 
+                       Icon="@(IsFullscreen ? Icons.Material.Filled.FullscreenExit : Icons.Material.Filled.Fullscreen)"
+                       Size="Size.Medium" 
+                       Style="position: absolute; top: 8px; right: 56px;" />
+    </TitleContent>
+    <DialogContent>
+        <div style="@($"height: {DialogContentHeight};")">
+            <StandaloneCodeEditor @ref="Editor"
+                                  Id="data-editor-instance-id"
+                                  ConstructionOptions="EditorConstructionOptions"
+                                  OnDidChangeModelContent="OnDidChangeModelContent"
+                                  OnDidInit="EditorOnDidInit"
+                                  CssClass="code-editor" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        @if (_isAdministrator && CanResend)
+        {
+            if (IsValueChanged)
+            {
+                <MudTooltip Text="@Localizer["DiscardChanges"]">
+                    <MudFab Color="Color.Error" OnClick="DiscardChanges" Size="Size.Medium" StartIcon="@Icons.Material.Filled.Undo" Style="color: white;" />
+                </MudTooltip>
+            }
+
+            if (_isEditMode)
+            {
+                <MudTooltip Text="@Localizer["ExitEditMode"]">
+                    <MudFab OnClick="ExitEditMode" Color="Color.Success" Size="Size.Medium" StartIcon="@Icons.Material.Filled.Close" />
+                </MudTooltip>
+            }
+            else
+            {
+                <MudTooltip Text="@Localizer["EnterEditMode"]">
+                    <MudFab OnClick="EnterEditMode" Color="Color.Success" Size="Size.Medium" StartIcon="@Icons.Material.Filled.Edit" />
+                </MudTooltip>
+            }
+            
+            <MudButton OnClick="Resend" Color="Color.Info" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Send">@Localizer["Resend"]</MudButton>
+        }
+        
+        <MudButton OnClick="Close">@Localizer["Close"]</MudButton>
+    </DialogActions>
+</MudDialog>

@@ -1,0 +1,21 @@
+<Project>
+    <ItemGroup>
+        <Content Remove="packages.lock.json" />
+        <Content Update="version.json">
+            <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+            <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+        </Content>
+        <None Update="version.json;packages.lock.json">
+            <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+            <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+        </None>
+
+        <Content Remove="**/.gitkeep" />
+        <None Include="**/.gitkeep" Pack="false" />
+
+        <Content Remove="econfig_root\**" />
+        <None Include="econfig_root\**" Pack="false" />
+    </ItemGroup>
+</Project>

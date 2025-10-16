@@ -1,0 +1,138 @@
+{
+    "Configurator": {
+        "Type": "ConnectorConfigurator",
+        "Enabled": true,
+        "Config": {
+            "Incoming": {
+                "Url": "http://"
+            },
+            "UrlIncoming": "http://0.0.0.0:38008/",
+            "UrlOutgoing": "http://0.0.0.0:38009/"
+        },
+        "PacketTransfer": {
+            "DbPath": "C:\\Work\\Databases\\OAuth.db",
+            "ChannelGroups": {
+                "Incoming": {
+                    "DbPollInterval": "10s",
+                    "PacketRetention": "10d"
+                }
+            }
+        },
+        "HttpIncoming": {
+            "Endpoints": {
+                "TestEndpoint2": {
+                    "Path": "/api/test/{id}",
+                    "Topic": "HttpConnector.Test.Topic",
+                    "HttpMethod": "POST",
+                    "Authorize": true,
+                    "ContentTypes": [ "text/plain" ]
+                }
+            }
+        }
+    },
+
+    "HttpConnector": {
+        "Type": "HttpConnector",
+        "Enabled": true,
+        "PacketTransfer": {
+            "DbPath": "C:\\Work\\Databases\\OAuth.db",
+            "SqlitePragmas": {
+                "busy_timeout": "5000",
+                "journal_mode":  "WAL"
+            },
+            "ChannelGroups": {
+                "Incoming": {
+                    "DbPollInterval": "1s",
+                    "PacketsPerCycle": 1,
+                    "PacketRetention": {
+                        "Error": "10d"
+                    },
+                    "CleanerInterval": "1h",
+                    "Channels": [ "eHubToEManager" ]
+                },
+                "Outgoing": {
+                    "DbPollInterval": "1s",
+                    "PacketsPerCycle": 1,
+                    "PacketRetention": "30d",
+                    "CleanerInterval": "1h",
+                    "Channels": [ "eManagerToEHub" ]
+                },
+                "Errors": {
+                    "DbPollInterval": "1s",
+                    "PacketsPerCycle": 1,
+                    "PacketRetention": "30d",
+                    "CleanerInterval": "1h",
+                    "CanResend": false,
+                    "Channels": [ "eManagerToEHub:Error", "eHubToEManager:Error" ]
+                }
+            }
+        },
+
+        "HttpIncoming": {
+            "Kestrel": {
+                "Endpoints": {
+                    "Http": {
+                        "Url": "http://0.0.0.0:8888/"
+                    }
+                }
+            },
+            //"Auth": {
+            //    "Enabled": false
+            //},
+            "Auth": {
+                "Enabled": true,
+                "Basic": {
+                    "DummyUsers": [
+                        {
+                            "Username": "adm",
+                            "Password": "2040"
+                        }
+                    ]
+                }
+            },
+            "InsertUnauthorizedPackets": false,
+            "Endpoints": {
+                "TestEndpoint": {
+                    "Path": "/api/test/{id}",
+                    "Topic": "HttpConnector.Test.Topic",
+                    "HttpMethod": "POST",
+                    "Authorize": true,
+                    "ContentTypes": [ "text/plain" ]
+                }
+            }
+        },
+        "HttpOutgoing": {
+            "Api": {
+                "TestServer": {
+                    "Authorization": {
+                        "Type": "Basic",
+                        "Basic": {
+                            "Username": "adm",
+                            "Password": "2040"
+                        }
+                    },
+                    "BaseAddress": "http://localhost:5008/api",
+                    "Timeout": "1m",
+                    "RetryPolicy": {
+                        "RetryCount": 5,
+                        "RetryDelay": 3,
+                        "RetryOnException": false,
+                        "ResponseStatuses": [ "5xx", "4x3" ]
+                    }
+                }
+            },
+            "ResendInProgressPacketsOnInterrupt": true,
+            "Endpoints": {
+                "TestEndpoint": {
+                    "Api": "TestServer",
+                    "Path": "/test",
+                    "Topic": "HttpConnector.Test.Topic",
+                    "HttpMethod": "POST"
+                }
+            }
+        },
+        "Config": {
+
+        }
+    }
+}

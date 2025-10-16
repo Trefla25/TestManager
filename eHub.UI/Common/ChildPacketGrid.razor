@@ -1,0 +1,95 @@
+@using eHub.Contracts.UIConfig
+@using eHub.PlugIn
+@using eController.WebUI.Utility.DynamicComponent
+@using static eHub.UI.Common.PacketGrid
+@inherits FrameworkComponent
+
+<MudTable T="PacketGridRow"
+		  Items="@(_gridPackets.Select(p => p.Value))"
+		  RowStyle="height: 55px;"
+		  OnRowClick="(args) => OnPacketRowClick?.Invoke(args.Item.Packet)"
+		  RowStyleFunc="@GetPacketRowStyle"
+		  Style="background-color: var(--mud-palette-background-grey);">
+	<RowTemplate>
+		<MudTd Style="width: 50px;">
+			@*// TODO: Display all levels of children recursively in a hierarchical manner. Currently only one level is displayed*@
+			@* @if (GroupPackets && Packets.Any(x => x.ParentId == context.Packet.Id))
+			{
+			<MudIconButton Icon="@(context.ShowChildContent ? Icons.Material.Filled.KeyboardArrowDown : Icons.Material.Filled.KeyboardArrowRight)"
+			OnClick="@(() => context.ShowChildContent = !context.ShowChildContent)" />
+			} *@
+		</MudTd>
+
+		@{
+			var idColumnConfig = GetColumnConfig(nameof(PacketDto.Id));
+			var dateCreatedColumnConfig = GetColumnConfig(nameof(PacketDto.DateCreated));
+			var dateChangedColumnConfig = GetColumnConfig(nameof(PacketDto.DateChanged));
+			var channelColumnConfig = GetColumnConfig(nameof(PacketDto.Channel));
+			var statusColumnConfig = GetColumnConfig(nameof(PacketDto.Status));
+			var parentIdColumnConfig = GetColumnConfig(nameof(PacketDto.ParentId));
+			var dataColumnConfig = GetColumnConfig(nameof(PacketDto.Data));
+			var retryCountColumnConfig = GetColumnConfig(nameof(PacketDto.RetryCount));
+			var dynamicFieldColumnConfig = GetColumnConfig(nameof(PacketDto.DynamicField));
+		}
+
+		@if (idColumnConfig.Visible)
+		{
+			<MudTd Style="@GetStyleFromWidth(idColumnConfig.Width)">@context.Packet.Id.ToString(idColumnConfig.Format)</MudTd>
+		}
+		@if (dateCreatedColumnConfig.Visible)
+		{
+			<MudTd Style="@GetStyleFromWidth(dateCreatedColumnConfig.Width)">@context.Packet.DateCreated.ToString(dateCreatedColumnConfig.Format)</MudTd>
+		}
+		@if (dateChangedColumnConfig.Visible)
+		{
+			<MudTd Style="@GetStyleFromWidth(dateChangedColumnConfig.Width)">@context.Packet.DateChanged?.ToString(dateChangedColumnConfig.Format)</MudTd>
+		}
+		@if (channelColumnConfig.Visible)
+		{
+			<MudTd Style="@GetStyleFromWidth(channelColumnConfig.Width)">@context.Packet.Channel</MudTd>
+		}
+		@if (parentIdColumnConfig.Visible)
+		{
+			<MudTd Style="@GetStyleFromWidth(parentIdColumnConfig.Width)">@context.Packet.ParentId?.ToString(parentIdColumnConfig.Format)</MudTd>
+		}
+		@if (retryCountColumnConfig.Visible)
+		{
+			<MudTd Style="@GetStyleFromWidth(retryCountColumnConfig.Width)">@context.Packet.RetryCount.ToString(retryCountColumnConfig.Format)</MudTd>
+		}
+		@if (dataColumnConfig.Visible)
+		{
+			<MudTd Style="@GetStyleFromWidth(dataColumnConfig.Width)">
+				<div style="@(GetPacketDataStyle())">
+					<PacketData @key="context.Packet.Id"
+								Packet="@context.Packet"
+								DataDisplay="DataDisplay"
+								OnOpenDataDialog="() => OnOpenDataDialog?.Invoke(context.Packet)" />
+				</div>
+			</MudTd>
+		}
+		@if (dynamicFieldColumnConfig.Visible)
+		{
+			<MudTd Style="@GetStyleFromWidth(dynamicFieldColumnConfig.Width)">@context.Packet.DynamicField</MudTd>
+		}
+		@if (statusColumnConfig.Visible)
+		{
+			<MudTd Class="pe-2 text-center" Style="@GetStyleFromWidth(statusColumnConfig.Width)">
+				<MudTooltip Text="@Localizer[$"{context.Packet.Status}"]">
+					@if (context.Packet.Status == PacketStatus.FatalError && IsAdministrator && !IsExportViewerMode && context.Packet.CanResend)
+					{
+						<MudButton StartIcon="@Icons.Material.Rounded.Error"
+								   IconColor="Color.Error"
+								   OnClick="@(() => OnPacketResendClick?.Invoke(context.Packet))"
+								   Tag="context.Packet">
+							@Localizer["Resend"]
+						</MudButton>
+					}
+					else
+					{
+						<MudIcon Icon="@GetStatusIcon(context.Packet.Status)" Color="GetStatusIconColor(context.Packet.Status)" Size="Size.Small" />
+					}
+				</MudTooltip>
+			</MudTd>
+		}
+	</RowTemplate>
+</MudTable>

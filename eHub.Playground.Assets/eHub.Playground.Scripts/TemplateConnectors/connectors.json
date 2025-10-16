@@ -1,0 +1,10 @@
+{
+  "Con_External": {
+    "Type": "eController.IntegrationHub.TestConnector",
+    "Enabled":  false,
+    "Config": {
+      "Message": "Ext3",
+      "Timeout": "30s"
+    }
+  }
+}

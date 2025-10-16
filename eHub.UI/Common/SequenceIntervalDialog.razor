@@ -1,0 +1,35 @@
+﻿@using eController.WebUI.Utility.DynamicComponent
+@inherits FrameworkComponent
+
+<MudDialog ClassContent="py-0">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @Localizer["SequenceInterval"]
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudCard Outlined="true" Class="mb-1">
+            <MudCardContent>
+                <div class="d-inline-flex gap-1">
+                    <MudNumericField HideSpinButtons="true" @bind-Value="SequenceStartId" Label="Sequence start Id" Variant="Variant.Text" Min="1" />
+                    <MudNumericField HideSpinButtons="true" @bind-Value="SequenceEndId" Label="Sequence end Id" Variant="Variant.Text" Min="1" />
+                </div>
+
+                <MudButton OnClick="SelectAll">@Localizer["SelectAll"]</MudButton>
+            </MudCardContent>
+        </MudCard>
+
+        <MudSelect T="string" Label="Channels" MultiSelection="true" @bind-SelectedValues="_selectedChannels" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined">
+            @foreach (var channel in Channels)
+            {
+                <MudSelectItem T="string" Value="@channel">@channel</MudSelectItem>
+            }
+        </MudSelect>
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@Localizer["Cancel"]</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Deselect">@Localizer["Deselect"]</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">@Localizer["Ok"]</MudButton>
+    </DialogActions>
+</MudDialog>
