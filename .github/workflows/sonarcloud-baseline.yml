@@ -1,0 +1,21 @@
+name: Baseline — All Sonar Projects
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch to analyze (default: develop)'
+        required: false
+        type: string
+        default: 'develop'
+
+jobs:
+  create-baseline:
+    name: Create SonarCloud Baseline
+    uses: Element-Logic/cicd-workflows/.github/workflows/sonarcloud-create-baseline.yml@main
+    with:
+      sonar_project_key: ehub
+      sonar_organization: element-logic
+      project_base_dir: ./
+      branch_name: ${{ inputs.branch_name }}
+    secrets: inherit

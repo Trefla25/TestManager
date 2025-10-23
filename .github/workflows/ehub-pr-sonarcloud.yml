@@ -15,7 +15,7 @@ jobs:
       service_base_dir: .
       dotnet_version: '9.0.x'
       os_matrix: '["ubuntu-latest"]'
-      sonar_project_key: Element-Logic_ehub
+      sonar_project_key: ehub
       coverage_exclusions: '**/Migrations/**'
       dockerfile_path: ''
       docker_image_repository: placeholder
