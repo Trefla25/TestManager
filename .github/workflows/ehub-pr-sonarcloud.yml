@@ -1,0 +1,49 @@
+name: eHub — PR CI (no Docker)
+
+on:
+  push:
+    branches:
+      #- main
+      - develop
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: Element-Logic/cicd-workflows/.github/workflows/ci-dotnet-service-pull-request.yml@main
+    with:
+      service_name: ehub
+      solution_or_project_path: eHub.slnx
+      service_base_dir: .
+      dotnet_version: '9.0.x'
+      os_matrix: '["ubuntu-latest"]'
+      sonar_project_key: Element-Logic_ehub
+      coverage_exclusions: '**/Migrations/**'
+      dockerfile_path: ''
+      docker_image_repository: placeholder
+      docker_image_artifact: placeholder
+      continue_on_test_failure: true
+    secrets: inherit
+
+  sonarcloud:
+    needs: [ci]
+    if: always()
+    uses: Element-Logic/cicd-workflows/.github/workflows/ci-sonarcloud-aggregate-analysis.yml@main
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: write
+    with:
+      sonar_project_key: ehub
+      sonar_organization: element-logic
+      pr_number: ${{ github.event.pull_request.number }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
+      head_ref: ${{ github.event.pull_request.head.ref }}
+      base_ref: ${{ github.event.pull_request.base.ref }}
+      project_base_dir: .
+      coverage_format: opencover
+      wait_for_quality_gate: true
+      comment_pr: true
+    secrets: inherit
