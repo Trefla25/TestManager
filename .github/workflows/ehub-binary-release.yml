@@ -1,0 +1,20 @@
+name: eHub — Binary Release (non-containerized)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: Element-Logic/cicd-workflows/.github/workflows/ci-dotnet-service-release.yml@main
+    with:
+      service_name: ehub
+      solution_or_project_path: eHub.slnx
+      service_base_dir: .
+      publish_output: ./publish
+      dotnet_version: '9.0.x'
+      os_matrix: '["ubuntu-latest"]'
+      dockerfile_path: ''
+      generic_repository: binary-el-test-local  
+    secrets: inherit
