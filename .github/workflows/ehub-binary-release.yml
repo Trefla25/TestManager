@@ -16,5 +16,7 @@ jobs:
       dotnet_version: '9.0.x'
       os_matrix: '["ubuntu-latest"]'
       dockerfile_path: ''
+      docker_image_repository: placeholder
+      docker_image_artifact: placeholder
       generic_repository: binary-el-test-local  
     secrets: inherit
