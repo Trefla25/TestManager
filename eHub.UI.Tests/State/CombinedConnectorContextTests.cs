@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-using System.Threading.Tasks;
 using eHub.Contracts;
 using eHub.Contracts.UIConfig;
 using eHub.PlugIn;
@@ -8,27 +6,24 @@ using eHub.UI.Services;
 using eHub.UI.State;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 
 namespace eHub.UI.Tests.State;
 
-[TestClass]
-public class CombinedConnectorContextTests
+public class CombinedConnectorContextTests : IAsyncLifetime
 {
-    private CombinedConnectorContext _combinedContext = default!;
-    private ConnectorIdentifier _combinedConnectorIdentifier = default!;
-    private ConnectorUiData _connectorUiData = default!;
-    private ConnectorIdentifier _connectorIdentifierA = default!;
-    private ConnectorIdentifier _connectorIdentifierB = default!;
-    private IConnectorContext _connectorA = default!;
-    private IConnectorContext _connectorB = default!;
-    private IConnectorRegistry _connectorRegistry = default!;
-    private IConnectorContextProvider _contextProvider = default!;
-    private CancellationTokenSource _cancellationTokenSource = default!;
+    private CombinedConnectorContext _combinedContext = null!;
+    private ConnectorIdentifier _combinedConnectorIdentifier;
+    private ConnectorUiData _connectorUiData = null!;
+    private ConnectorIdentifier _connectorIdentifierA;
+    private ConnectorIdentifier _connectorIdentifierB;
+    private IConnectorContext _connectorA = null!;
+    private IConnectorContext _connectorB = null!;
+    private IConnectorRegistry _connectorRegistry = null!;
+    private IConnectorContextProvider _contextProvider = null!;
+    private CancellationTokenSource _cancellationTokenSource = null!;
 
-    [TestInitialize]
-    public void TestInitialize()
+    public ValueTask InitializeAsync()
     {
         _cancellationTokenSource = new();
         _combinedConnectorIdentifier = new ConnectorIdentifier("instance", "Combined");
@@ -66,45 +61,55 @@ public class CombinedConnectorContextTests
         _contextProvider.GetConnectorContext(_connectorIdentifierB).Returns(_connectorB);
 
         _combinedContext = new CombinedConnectorContext(_combinedConnectorIdentifier, _connectorUiData, _connectorRegistry, _contextProvider, NullLogger<CombinedConnectorContext>.Instance);
+        return ValueTask.CompletedTask;
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RunAsync_WithInnerContexts_SubscribesToAllContexts()
     {
+        // Arrange
         var raisedEvents = new List<(ConnectorIdentifier Identifier, ConnectorPacketsChangedDto Changed)>();
         _combinedContext.OnConnectorPacketsChanged += (x, y) => raisedEvents.Add((x, y));
 
+        // Act
         await _combinedContext.RunAsync(CancellationToken.None);
 
         _connectorA.OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(_connectorIdentifierA, ConnectorPacketsChangedDto.Any);
         _connectorB.OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(_connectorIdentifierB, ConnectorPacketsChangedDto.Any);
-
+        
+        // Assert
         raisedEvents.Should().HaveCount(2);
         raisedEvents.Should().OnlyContain(x => x.Identifier == _combinedConnectorIdentifier && x.Changed == ConnectorPacketsChangedDto.Any);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ConnectorPacketsChangedHandler_WhenNoSubscribers_DoesNotThrow()
     {
+        // Arrange
         await _combinedContext.RunAsync(CancellationToken.None);
-
+        
+        // Act
         var act = () =>
             _connectorA.OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(_connectorIdentifierA, ConnectorPacketsChangedDto.Any);
-
+        
+        // Assert
         act.Should().NotThrow();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetUIViewConfig_WhenCalled_ReturnsExpectedConfig()
     {
+        // Act
         var result = _combinedContext.GetUIViewConfig();
-
+        
+        // Assert
         result.Should().Be(_connectorUiData.UIViewConfig);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetCustomFilters_WithValidFilters_ReturnsExpectedFilters()
     {
+        // Arrange
         var customFiltersA = new Dictionary<string, Type>
         {
             { "Filter1", typeof(int) },
@@ -120,8 +125,11 @@ public class CombinedConnectorContextTests
         _connectorB.GetCustomFilters().Returns(customFiltersB);
 
         await _combinedContext.RunAsync(CancellationToken.None);
+        
+        // Act
         var result = _combinedContext.GetCustomFilters();
-
+        
+        // Assert
         result.Should().NotBeNull();
         result.Should().HaveCount(3);
         result.Should().ContainKey("Filter1");
@@ -133,9 +141,10 @@ public class CombinedConnectorContextTests
         result["Filter3"].Should().Be<DateTime>();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetCustomFilters_WhenNotInitialized_ReturnsEmpty()
     {
+        // Arrange
         var customFiltersA = new Dictionary<string, Type>
         {
             { "Filter1", typeof(int) },
@@ -149,16 +158,19 @@ public class CombinedConnectorContextTests
 
         _connectorA.GetCustomFilters().Returns(customFiltersA);
         _connectorB.GetCustomFilters().Returns(customFiltersB);
-
+        
+        // Act
         var result = _combinedContext.GetCustomFilters();
-
+        
+        // Assert
         result.Should().NotBeNull();
         result.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetCustomFilters_WithConflictingFilters_KeepsLatest()
     {
+        // Arrange
         var customFiltersA = new Dictionary<string, Type>
         {
             { "Filter1", typeof(int) },
@@ -173,9 +185,11 @@ public class CombinedConnectorContextTests
         _connectorA.GetCustomFilters().Returns(customFiltersA);
         _connectorB.GetCustomFilters().Returns(customFiltersB);
 
+        // Act
         await _combinedContext.RunAsync(CancellationToken.None);
         var result = _combinedContext.GetCustomFilters();
-
+        
+        // Assert
         result.Should().NotBeNull();
         result.Should().HaveCount(2);
         result.Should().ContainKey("Filter1");
@@ -185,55 +199,65 @@ public class CombinedConnectorContextTests
         result["Filter2"].Should().Be<DateTime>();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task DeletePacketsAsync_WithInnerContexts_CallsAllContexts()
     {
+        // Arrange
         var packetA1 = new PacketDto { Id = 1, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packetA2 = new PacketDto { Id = 2, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, Data = "data2", ParentId = null, Status = PacketStatus.Enqueued };
         var packetB1 = new PacketDto { Id = 3, ConnectorName = "ConnectorB", Channel = "Test", DateCreated = DateTime.Now, Data = "data3", ParentId = null, Status = PacketStatus.Enqueued };
         var packets = new HashSet<PacketDto> { packetA1, packetA2, packetB1 };
-
+        
+        // Act
         await _combinedContext.DeletePacketsAsync(packets);
-
+        
+        // Assert
         await _connectorA.Received(1).DeletePacketsAsync(
             Arg.Is<HashSet<PacketDto>>(set => set.SetEquals(new[] { packetA1, packetA2 })));
         await _connectorB.Received(1).DeletePacketsAsync(
             Arg.Is<HashSet<PacketDto>>(set => set.SetEquals(new[] { packetB1 })));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ResendPacketsAsync_WithInnerContexts_CallsAllContexts()
     {
+        // Arrange
         var packetA = new PacketDto { Id = 1, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packetB = new PacketDto { Id = 2, ConnectorName = "ConnectorB", Channel = "Test", DateCreated = DateTime.Now, Data = "data2", ParentId = null, Status = PacketStatus.Enqueued };
         var packets = new HashSet<PacketDto> { packetA, packetB };
-
+        
+        // Act
         await _combinedContext.ResendPacketsAsync(packets);
-
+        
+        // Assert
         await _connectorA.Received(1).ResendPacketsAsync(
             Arg.Is<HashSet<PacketDto>>(set => set.SetEquals(new[] { packetA })));
         await _connectorB.Received(1).ResendPacketsAsync(
             Arg.Is<HashSet<PacketDto>>(set => set.SetEquals(new[] { packetB })));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StopPacketsAsync_WithInnerContexts_CallsAllContexts()
     {
+        // Arrange
         var packetA = new PacketDto { Id = 1, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packetB = new PacketDto { Id = 2, ConnectorName = "ConnectorB", Channel = "Test", DateCreated = DateTime.Now, Data = "data2", ParentId = null, Status = PacketStatus.Enqueued };
         var packets = new HashSet<PacketDto> { packetA, packetB };
-
+        
+        // Act
         await _combinedContext.StopPacketsAsync(packets);
-
+        
+        // Assert
         await _connectorA.Received(1).StopPacketsAsync(
             Arg.Is<HashSet<PacketDto>>(set => set.SetEquals(new[] { packetA })));
         await _connectorB.Received(1).StopPacketsAsync(
             Arg.Is<HashSet<PacketDto>>(set => set.SetEquals(new[] { packetB })));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ImportPacketsAsync_WhenAnyImportFails_ReturnsFalse()
     {
+        // Arrange
         var packetA = new PacketDto { Id = 1, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packetB = new PacketDto { Id = 2, ConnectorName = "ConnectorB", Channel = "Test", DateCreated = DateTime.Now, Data = "data2", ParentId = null, Status = PacketStatus.Enqueued };
         var packets = new List<PacketDto> { packetA, packetB };
@@ -243,17 +267,20 @@ public class CombinedConnectorContextTests
             .Returns(await Task.FromResult(false));
         _connectorB.ImportPacketsAsync(Arg.Any<ConnectorPacketsExportDto>(), Arg.Any<bool>())
             .Returns(await Task.FromResult(true));
-
+        
+        // Act
         var result = await _combinedContext.ImportPacketsAsync(importData, false);
-
+        
+        // Assert
         result.Should().BeFalse();
         await _connectorA.Received(1).ImportPacketsAsync(importData, false);
         await _connectorB.DidNotReceive().ImportPacketsAsync(importData, false);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ImportPacketsAsync_WhenAllImportsSucceed_ReturnsTrue()
     {
+        // Arrange
         var packetA = new PacketDto { Id = 1, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packetB = new PacketDto { Id = 2, ConnectorName = "ConnectorB", Channel = "Test", DateCreated = DateTime.Now, Data = "data2", ParentId = null, Status = PacketStatus.Enqueued };
         var packets = new List<PacketDto> { packetA, packetB };
@@ -263,15 +290,17 @@ public class CombinedConnectorContextTests
             .Returns(await Task.FromResult(true));
         _connectorB.ImportPacketsAsync(Arg.Any<ConnectorPacketsExportDto>(), Arg.Any<bool>())
             .Returns(await Task.FromResult(true));
-
+        
+        // Act
         var result = await _combinedContext.ImportPacketsAsync(importData, true);
-
+        
+        // Assert
         result.Should().BeTrue();
         await _connectorA.Received(1).ImportPacketsAsync(importData, true);
         await _connectorB.Received(1).ImportPacketsAsync(importData, true);
     }
 
-    public async Task TestCleanup()
+    public async ValueTask DisposeAsync()
     {
         await _cancellationTokenSource.CancelAsync();
     }

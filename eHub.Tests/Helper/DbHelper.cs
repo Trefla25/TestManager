@@ -37,7 +37,7 @@ internal static class DbHelper
         var random = new Random();
 
         // Get all values of the PacketStatus enum.
-        var statuses = Enum.GetValues<PacketStatus>().Cast<PacketStatus>().ToArray();
+        var statuses = Enum.GetValues<PacketStatus>();
 
         // Calculate the interval between packets.
         var totalDuration = endDate - startDate;
@@ -45,7 +45,7 @@ internal static class DbHelper
             ? TimeSpan.FromTicks(totalDuration.Ticks / (count - 1))
             : TimeSpan.Zero;
 
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
             var packet = new Packet
             {

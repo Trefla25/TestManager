@@ -3,113 +3,136 @@ using FluentAssertions;
 
 namespace eHub.Tests.Connectors.FluentApi;
 
-[TestClass]
 public class CustomFilterBuilderTests
 {
     private readonly CustomFilterBuilder _builder = new();
 
-    [TestMethod]
+    [Fact]
     public void AddCustomFilter_WithValidInput_AddsFilter()
     {
-        var filterKey = "TestFilter";
-        var sqlExpression = "CAST(BinaryData AS INT)";
+        // Arrange
+        const string filterKey = "TestFilter";
+        const string sqlExpression = "CAST(BinaryData AS INT)";
 
+        // Act
         _builder.AddCustomFilter<int>(filterKey, sqlExpression);
         var result = _builder.GetCustomFilters();
-
+        
+        // Assert
         result.Should().ContainKey(filterKey);
         result[filterKey].SqlExpression.Should().Be(sqlExpression);
         result[filterKey].Type.Should().Be<int>();
     }
 
-    [TestMethod]
+    [Fact]
     public void AddCustomFilter_WithNullFilterKey_ThrowsArgumentException()
     {
-        var sqlExpression = "CAST(BinaryData AS INT)";
-
+        // Arrange
+        const string sqlExpression = "CAST(BinaryData AS INT)";
+        
+        // Act
         var act = () => _builder.AddCustomFilter<int>(null!, sqlExpression);
-
+        
+        // Assert
         act.Should().Throw<ArgumentException>()
             .WithMessage("Filter key cannot be null or whitespace.*")
             .And.ParamName.Should().Be("filterKey");
     }
 
-    [DataTestMethod]
-    [DataRow("")]
-    [DataRow("   ")]
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
     public void AddCustomFilter_WithWhitespaceFilterKey_ThrowsArgumentException(string filterKey)
     {
-        var sqlExpression = "CAST(BinaryData AS INT)";
-
+        // Arrange
+        const string sqlExpression = "CAST(BinaryData AS INT)";
+        
+        // Act
         var act = () => _builder.AddCustomFilter<int>(filterKey, sqlExpression);
-
+        
+        // Assert
         act.Should().Throw<ArgumentException>()
             .WithMessage("Filter key cannot be null or whitespace.*")
             .And.ParamName.Should().Be("filterKey");
     }
 
-    [TestMethod]
+    [Fact]
     public void AddCustomFilter_WithPacketFilterKey_ThrowsArgumentException()
     {
-        var sqlExpression = "CAST(BinaryData AS INT)";
-
+        // Arrange
+        const string sqlExpression = "CAST(BinaryData AS INT)";
+        
+        // Act
         var act = () => _builder.AddCustomFilter<int>("Id", sqlExpression);
-
+        
+        // Assert
         act.Should().Throw<ArgumentException>()
             .WithMessage($"The filter key 'Id' is reserved as it matches an existing packet column.*")
             .And.ParamName.Should().Be("filterKey");
     }
 
-    [TestMethod]
+    [Fact]
     public void AddCustomFilter_WithNullSqlExpression_ThrowsArgumentException()
     {
-        var filterKey = "TestFilter";
-
+        // Arrange
+        const string filterKey = "TestFilter";
+        
+        // Act
         var act = () => _builder.AddCustomFilter<int>(filterKey, null!);
-
+        
+        // Assert
         act.Should().Throw<ArgumentException>()
             .WithMessage("SQL expression cannot be null or whitespace.*")
             .And.ParamName.Should().Be("sqlExpression");
     }
 
-    [DataTestMethod]
-    [DataRow("")]
-    [DataRow("   ")]
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
     public void AddCustomFilter_WithWhitespaceSqlExpression_ThrowsArgumentException(string sqlExpression)
     {
-        var filterKey = "TestFilter";
-
+        // Arrange
+        const string filterKey = "TestFilter";
+        
+        // Act
         Action act = () => _builder.AddCustomFilter<int>(filterKey, sqlExpression);
-
+        
+        // Assert
         act.Should().Throw<ArgumentException>()
             .WithMessage("SQL expression cannot be null or whitespace.*")
             .And.ParamName.Should().Be("sqlExpression");
     }
 
-    [TestMethod]
+    [Fact]
     public void AddCustomFilter_WithDuplicateKey_ThrowsArgumentException()
     {
-        var filterKey = "DuplicateFilter";
-        var sqlExpression = "CAST(BinaryData AS INT)";
+        // Arrange
+        const string filterKey = "DuplicateFilter";
+        const string sqlExpression = "CAST(BinaryData AS INT)";
 
+        // Act
         _builder.AddCustomFilter<int>(filterKey, sqlExpression);
         var act = () => _builder.AddCustomFilter<int>(filterKey, sqlExpression);
-
+        
+        // Assert
         act.Should().Throw<ArgumentException>()
             .WithMessage($"A filter with the key '{filterKey}' already exists.*")
             .And.ParamName.Should().Be("filterKey");
     }
 
-    [TestMethod]
+    [Fact]
     public void GetCustomFilters_ReturnsImmutableDictionary_WithAllAddedFilters()
     {
+        // Arrange
         _builder
             .AddCustomFilter<int>("Filter1", "CAST(BinaryData AS INT)")
             .AddCustomFilter<string>("Filter2", "SUBSTRING(BinaryData, 1, 5)")
             .AddCustomFilter<DateTime>("Filter3", "CAST(BinaryData AS DATETIME)");
-
+        
+        // Act
         var filters = _builder.GetCustomFilters();
-
+        
+        // Assert
         filters.Should().HaveCount(3);
         filters.Should().ContainKey("Filter1");
         filters.Should().ContainKey("Filter2");

@@ -5,10 +5,9 @@ using FluentAssertions;
 
 namespace eHub.Tests.Connectors.PacketTransfer.UI;
 
-[TestClass]
 public class ColumnFilterTests
 {
-    [TestMethod]
+    [Fact]
     public void IsNumericFilter_WithNumericColumns_ReturnsTrue()
     {
         new ColumnFilterDto(nameof(PacketDto.Id), ColumnFilterOperator.Equal, null).IsNumericFilter().Should().BeTrue();
@@ -16,7 +15,7 @@ public class ColumnFilterTests
         new ColumnFilterDto (nameof(PacketDto.RetryCount), ColumnFilterOperator.Equal, null).IsNumericFilter().Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsNumericFilter_WithNonNumericColumns_ReturnsFalse()
     {
         new ColumnFilterDto(nameof(PacketDto.Channel), ColumnFilterOperator.Equal, null).IsNumericFilter().Should().BeFalse();
@@ -28,14 +27,14 @@ public class ColumnFilterTests
         new ColumnFilterDto(nameof(PacketDto.Status), ColumnFilterOperator.Equal, null).IsNumericFilter().Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDateTimeFilter_WithDateTimeColumns_ReturnsTrue()
     {
         new ColumnFilterDto(nameof(PacketDto.DateCreated), ColumnFilterOperator.Equal, null).IsDateTimeFilter().Should().BeTrue();
         new ColumnFilterDto(nameof(PacketDto.DateChanged), ColumnFilterOperator.Equal, null).IsDateTimeFilter().Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDateTimeFilter_WithNonDateTimeColumns_ReturnsFalse()
     {
         new ColumnFilterDto(nameof(PacketDto.Id), ColumnFilterOperator.Equal, null).IsDateTimeFilter().Should().BeFalse();
@@ -48,7 +47,7 @@ public class ColumnFilterTests
         new ColumnFilterDto(nameof(PacketDto.Status), ColumnFilterOperator.Equal, null).IsDateTimeFilter().Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsStringFilter_WithStringColumns_ReturnsTrue()
     {
         new ColumnFilterDto(nameof(PacketDto.Channel), ColumnFilterOperator.Equal, null).IsStringFilter().Should().BeTrue();
@@ -56,7 +55,7 @@ public class ColumnFilterTests
         new ColumnFilterDto(nameof(PacketDto.Metadata), ColumnFilterOperator.Equal, null).IsStringFilter().Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsStringFilter_WithNonStringColumns_ReturnsFalse()
     {
         new ColumnFilterDto(nameof(PacketDto.Id), ColumnFilterOperator.Equal, null).IsStringFilter().Should().BeFalse();
@@ -67,13 +66,13 @@ public class ColumnFilterTests
         new ColumnFilterDto(nameof(PacketDto.Status), ColumnFilterOperator.Equal, null).IsStringFilter().Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsStatusFilter_WithStatusColumn_ReturnsTrue()
     {
         new ColumnFilterDto(nameof(PacketDto.Status), ColumnFilterOperator.Equal, null).IsStatusFilter().Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsStatusFilter_WithNonStatusColumn_ReturnsFalse()
     {
         new ColumnFilterDto(nameof(PacketDto.Id), ColumnFilterOperator.Equal, null).IsStatusFilter().Should().BeFalse();
@@ -87,13 +86,13 @@ public class ColumnFilterTests
         new ColumnFilterDto(nameof(PacketDto.Data), ColumnFilterOperator.Equal, null).IsStatusFilter().Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFilter_WithDataColumn_ReturnsTrue()
     {
         new ColumnFilterDto(nameof(PacketDto.Data), ColumnFilterOperator.Equal, null).IsDataFilter().Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFilter_WithNonDataColumn_ReturnsFalse()
     {
         new ColumnFilterDto(nameof(PacketDto.Id), ColumnFilterOperator.Equal, null).IsDataFilter().Should().BeFalse();
@@ -107,289 +106,346 @@ public class ColumnFilterTests
         new ColumnFilterDto(nameof(PacketDto.Status), ColumnFilterOperator.Equal, null).IsDataFilter().Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_NoFilters_ReturnsTrue()
     {
-        var data = "any value";
-        var filters = new List<ColumnFilterDto>();
-
+        // Arrange
+        const string data = "any value";
+        var filters = Array.Empty<ColumnFilterDto>();
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenMatchingEqual_ReturnsTrue()
     {
-        var data = "match";
+        // Arrange
+        const string data = "match";
         var filters = new ColumnFilterDto[]
         {
             new(nameof(PacketDto.Data), ColumnFilterOperator.Equal, "match" )
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenNotMatchingEqual_ReturnsFalse()
     {
-        var data = "no match";
+        // Arrange
+        const string data = "no match";
         var filters = new ColumnFilterDto[]
         {
             new(nameof(PacketDto.Data), ColumnFilterOperator.Equal, "match" )
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenMatchingNotEqual_ReturnsFalse()
     {
-        var data = "match";
+        // Arrange
+        const string data = "match";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.NotEqual, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenNotMatchingNotEqual_ReturnsTrue()
     {
-        var data = "no match";
+        // Arrange
+        const string data = "no match";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.NotEqual, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenMatchingContains_ReturnsTrue()
     {
-        var data = "one match data";
+        // Arrange
+        const string data = "one match data";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.Contains, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenNotMatchingContains_ReturnsFalse()
     {
-        var data = "no data";
+        // Arrange
+        const string data = "no data";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.Contains, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenMatchingNotContains_ReturnsTrue()
     {
-        var data = "no data";
+        // Arrange
+        const string data = "no data";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.NotContains, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenNotMatchingNotContains_ReturnsFalse()
     {
-        var data = "one match data";
+        // Arrange
+        const string data = "one match data";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.NotContains, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenMatchingStart_ReturnsTrue()
     {
-        var data = "match this";
+        // Arrange
+        const string data = "match this";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.StartsWith, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenNotMatchingStart_ReturnsFalse()
     {
         // Arrange
-        var data = "no match";
+        const string data = "no match";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.StartsWith, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenMatchingEnd_ReturnsTrue()
     {
-        var data = "this match";
+        // Arrange
+        const string data = "this match";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.EndsWith, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenNotMatchingEnd_ReturnsFalse()
     {
         // Arrange
-        var data = "match this";
+        const string data = "match this";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.EndsWith, "match")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenMatchingEmpty_ReturnsTrue()
     {
-        var data = "";
+        // Arrange
+        const string data = "";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.Empty, null)
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenNotMatchingEmpty_ReturnsFalse()
     {
-        var data = "not empty";
+        // Arrange
+        const string data = "not empty";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.Empty, null)
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenMatchingNotEmpty_ReturnsTrue()
     {
-        var data = "match";
+        // Arrange
+        const string data = "match";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.NotEmpty, null)
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_WhenNotMatchingNotEmpty_ReturnsFalse()
     {
-        var data = "";
+        // Arrange
+        const string data = "";
         var filters = new ColumnFilterDto[]
         {
             new (nameof(PacketDto.Data), ColumnFilterOperator.NotEmpty, null)
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_MultipleValidFilters_ReturnsTrue()
     {
-        var data = "hello world!";
+        // Arrange
+        const string data = "hello world!";
         var filters = new ColumnFilterDto[]
         {
             new(nameof(PacketDto.Data), ColumnFilterOperator.Contains, "hello" ),
             new(nameof(PacketDto.Data), ColumnFilterOperator.EndsWith, "world!"),
             new(nameof(PacketDto.Data), ColumnFilterOperator.NotEmpty, null)
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeTrue();
     }
 
-    [TestMethod]
-    public void IsDataFiltered_AtleastOneInvalidFilter_ReturnsFalse()
+    [Fact]
+    public void IsDataFiltered_AtLeastOneInvalidFilter_ReturnsFalse()
     {
-        var data = "hello world!";
+        // Arrange
+        const string data = "hello world!";
         var filters = new ColumnFilterDto[]
         {
             new(nameof(PacketDto.Data), ColumnFilterOperator.Contains, "hello" ),
             new(nameof(PacketDto.Data), ColumnFilterOperator.EndsWith, "world!"),
             new(nameof(PacketDto.Data), ColumnFilterOperator.StartsWith, "start")
         };
-
+        
+        // Act
         var result = filters.Matches(data);
-
+        
+        // Assert
         result.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void IsDataFiltered_UnsupportedOperators_ThrowsException()
     {
-        var data = "some data";
+        // Arrange
+        const string data = "some data";
         var greaterThanFilter = new ColumnFilterDto[] { new (nameof(PacketDto.Data), ColumnFilterOperator.GreaterThan, null) };
         var greaterThanOrEqualFilter = new ColumnFilterDto[] { new (nameof(PacketDto.Data), ColumnFilterOperator.GreaterThanOrEqual, null) };
         var lessThanFilter = new ColumnFilterDto[] { new(nameof(PacketDto.Data), ColumnFilterOperator.LessThan, null) };
         var lessThanOrEqualFilter = new ColumnFilterDto[] { new(nameof(PacketDto.Data), ColumnFilterOperator.LessThanOrEqual, null) };
 
+        // Act
         var greaterThanAct = () => greaterThanFilter.Matches(data);
         var greaterThanOrEqualAct = () => greaterThanOrEqualFilter.Matches(data);
         var lessThanAct = () => lessThanFilter.Matches(data);
         var lessThanOrEqualAct = () => lessThanOrEqualFilter.Matches(data);
-
+        // Assert
         greaterThanAct.Should().Throw<InvalidOperationException>().WithMessage("Unsupported operator GreaterThan for filtering data");
         greaterThanOrEqualAct.Should().Throw<InvalidOperationException>().WithMessage("Unsupported operator GreaterThanOrEqual for filtering data");
         lessThanAct.Should().Throw<InvalidOperationException>().WithMessage("Unsupported operator LessThan for filtering data");

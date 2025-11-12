@@ -15,31 +15,29 @@ using eMessenger.Tests;
 
 namespace eHub.Tests.Connectors.Http;
 
-[TestClass]
-public class OutgoingPacketTests
+public class OutgoingPacketTests : IAsyncLifetime
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly List<PacketData> _packets = [];
 
-    private HttpConnectorFeature _httpConnectorFeature = default!;
-    private ConnectorMetadata _metadata = default!;
-    private ConnectorTemplate _template = default!;
-    private HttpOutgoing _httpOutgoingConfig = default!;
+    private HttpConnectorFeature _httpConnectorFeature = null!;
+    private ConnectorMetadata _metadata = null!;
+    private ConnectorTemplate _template = null!;
+    private HttpOutgoing _httpOutgoingConfig = null!;
 
-    private IHttpPacketTransfer _httpPacketTransfer = default!;
-    private IPacketRepository _packetRepository = default!;
-    private IPacketCreateBuilder _packetCreateBuilder = default!;
-    private IPacketUpdateBuilder _packetUpdateBuilder = default!;
-    private IPacketQueryBuilder _packetQueryBuilder = default!;
-    private IServiceProvider _serviceProvider = default!;
-    private ILoggerFactory _loggerFactory = default!;
-    private ILogger<HttpConnectorFeature> _logger = default!;
-    private IConfiguration _configuration = default!;
-    private IScopedMessenger _messenger = default!;
-    private IHttpClientFactory _httpClientFactory = default!;
+    private IHttpPacketTransfer _httpPacketTransfer = null!;
+    private IPacketRepository _packetRepository = null!;
+    private IPacketCreateBuilder _packetCreateBuilder = null!;
+    private IPacketUpdateBuilder _packetUpdateBuilder = null!;
+    private IPacketQueryBuilder _packetQueryBuilder = null!;
+    private IServiceProvider _serviceProvider = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private ILogger<HttpConnectorFeature> _logger = null!;
+    private IConfiguration _configuration = null!;
+    private IScopedMessenger _messenger = null!;
+    private IHttpClientFactory _httpClientFactory = null!;
 
-    [TestInitialize]
-    public void TestInitialize()
+    public ValueTask InitializeAsync()
     {
         _httpPacketTransfer = Substitute.For<IHttpPacketTransfer>();
         _serviceProvider = Substitute.For<IServiceProvider>();
@@ -67,20 +65,25 @@ public class OutgoingPacketTests
             Enabled = true,
             HttpOutgoing = _httpOutgoingConfig,
         };
+        
+        return ValueTask.CompletedTask;
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ProcessPacket_WhenResponseIs200_SetsProcessed()
     {
-        ValueTask<ConnectorResponse> ExecuteOutgoingRequest(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
+        // Arrange
+        ValueTask<ConnectorResponse> ExecuteOutgoingRequestAsync(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
            => ValueTask.FromResult(ConnectorResponses.HttpOk(_metadata.TemplateName));
 
         _template.HttpIncoming = null;
-        var requestContent = "{\"test\":\"request-data\"}";
-        var outgoingChannel = "TestOutgoingChannel";
-
-        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequest);
-
+        const string requestContent = "{\"test\":\"request-data\"}";
+        const string outgoingChannel = "TestOutgoingChannel";
+        
+        // Act
+        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequestAsync);
+        
+        // Assert
         // Verify the response
         response.Http.Should().NotBeNull();
         response.Http.StatusCode.Should().Be(200);
@@ -94,23 +97,26 @@ public class OutgoingPacketTests
         packet.Status.Should().Be(PacketStatus.Processed);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ProcessPacket_WhenResponseIs400_SetsFatalError()
     {
-        ValueTask<ConnectorResponse> ExecuteOutgoingRequest(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
+        // Arrange
+        ValueTask<ConnectorResponse> ExecuteOutgoingRequestAsync(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
            => ValueTask.FromResult(ConnectorResponses.HttpBadRequest(_metadata.TemplateName, "Some message"));
 
         _template.HttpIncoming = null;
-        var requestContent = "{\"test\":\"request-data\"}";
-        var outgoingChannel = "TestOutgoingChannel";
-
-        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequest);
-
+        const string requestContent = "{\"test\":\"request-data\"}";
+        const string outgoingChannel = "TestOutgoingChannel";
+        
+        // Act
+        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequestAsync);
+        
+        // Assert
         // Verify the response
         response.Http.Should().NotBeNull();
         response.Http.StatusCode.Should().Be(400);
 
-        var expectedContent = "{\"type\":\"https://httpstatuses.com/400\",\"title\":\"Bad Request\",\"status\":400,\"detail\":\"Some message\"}";
+        const string expectedContent = "{\"type\":\"https://httpstatuses.com/400\",\"title\":\"Bad Request\",\"status\":400,\"detail\":\"Some message\"}";
         response.ContentType.Should().Be(MediaTypeNames.Application.Json);
         response.Content.ToArray().Should().BeEquivalentTo(Encoding.UTF8.GetBytes(expectedContent));
 
@@ -124,26 +130,28 @@ public class OutgoingPacketTests
         packet.Channel.Should().Be(outgoingChannel);
         packet.Status.Should().Be(PacketStatus.FatalError);
 
-        var binaryData = $"Request failed with status code 400. Response Content: {expectedContent}";
-
+        const string binaryData = $"Request failed with status code 400. Response Content: {expectedContent}";
         childPacket.BinaryData.ToArray().Should().BeEquivalentTo(Encoding.UTF8.GetBytes(binaryData));
         childPacket.ParentId.Should().Be(packet.Id);
         childPacket.Channel.Should().Be(outgoingChannel + ":Error");
         childPacket.Status.Should().Be(PacketStatus.FatalError);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ProcessPacket_WhenResponseIs202AndRetry_KeepsEnqueued()
     {
-        ValueTask<ConnectorResponse> ExecuteOutgoingRequest(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
+        // Arrange
+        ValueTask<ConnectorResponse> ExecuteOutgoingRequestAsync(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
             => ValueTask.FromResult(ConnectorResponses.HttpPacketTransferState(_metadata.TemplateName, 202, ProcessPacketState.Retry));
 
         _template.HttpIncoming = null;
-        var requestContent = "{\"test\":\"request-data\"}";
-        var outgoingChannel = "TestOutgoingChannel";
-
-        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequest);
-
+        const string requestContent = "{\"test\":\"request-data\"}";
+        const string outgoingChannel = "TestOutgoingChannel";
+        
+        // Act
+        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequestAsync);
+        
+        // Assert
         // Verify the response
         response.Http.Should().NotBeNull();
         response.Http.StatusCode.Should().Be(202);
@@ -157,18 +165,21 @@ public class OutgoingPacketTests
         packet.Status.Should().Be(PacketStatus.Enqueued);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ProcessPacket_WhenResponseIs406AndSuccess_SetsProcessed()
     {
-        ValueTask<ConnectorResponse> ExecuteOutgoingRequest(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
+        // Arrange
+        ValueTask<ConnectorResponse> ExecuteOutgoingRequestAsync(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
            => ValueTask.FromResult(ConnectorResponses.HttpPacketTransferState(_metadata.TemplateName, 406, ProcessPacketState.Success));
 
         _template.HttpIncoming = null;
-        var requestContent = "{\"test\":\"request-data\"}";
-        var outgoingChannel = "TestOutgoingChannel";
-
-        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequest);
-
+        const string requestContent = "{\"test\":\"request-data\"}";
+        const string outgoingChannel = "TestOutgoingChannel";
+        
+        // Act
+        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequestAsync);
+        
+        // Assert
         // Verify the response
         response.Http.Should().NotBeNull();
         response.Http.StatusCode.Should().Be(406);
@@ -182,8 +193,7 @@ public class OutgoingPacketTests
         packet.Channel.Should().Be(outgoingChannel);
         packet.Status.Should().Be(PacketStatus.Processed);
 
-        var binaryData = "Request failed with status code 406. Response Content: ";
-
+        const string binaryData = "Request failed with status code 406. Response Content: ";
         childPacket.BinaryData.ToArray().Should().BeEquivalentTo(Encoding.UTF8.GetBytes(binaryData));
         childPacket.ParentId.Should().Be(packet.Id);
         childPacket.Channel.Should().Be(outgoingChannel + ":Error");
@@ -191,18 +201,21 @@ public class OutgoingPacketTests
     }
 
 
-    [TestMethod]
+    [Fact]
     public async Task ProcessPacket_WhenResponseIs202AndError_SetsError()
     {
-        ValueTask<ConnectorResponse> ExecuteOutgoingRequest(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
+        // Arrange
+        ValueTask<ConnectorResponse> ExecuteOutgoingRequestAsync(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
            => ValueTask.FromResult(ConnectorResponses.HttpPacketTransferProblem("Some Title", _metadata.TemplateName, 202, ProcessPacketState.Error, "Some message"));
 
         _template.HttpIncoming = null;
-        var requestContent = "{\"test\":\"request-data\"}";
-        var outgoingChannel = "TestOutgoingChannel";
-
-        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequest);
-
+        const string requestContent = "{\"test\":\"request-data\"}";
+        const string outgoingChannel = "TestOutgoingChannel";
+        
+        // Act
+        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequestAsync);
+        
+        // Assert
         // Verify the response
         response.Http.Should().NotBeNull();
         response.Http!.StatusCode.Should().Be(202);
@@ -221,25 +234,28 @@ public class OutgoingPacketTests
         packet.Channel.Should().Be(outgoingChannel);
         packet.Status.Should().Be(PacketStatus.Error);
 
-        var binaryData = "Request failed with status code 202. Response Content: {\"type\":\"https://httpstatuses.com/202\",\"title\":\"Some Title\",\"status\":202,\"detail\":\"Some message\"}";
+        const string binaryData = "Request failed with status code 202. Response Content: {\"type\":\"https://httpstatuses.com/202\",\"title\":\"Some Title\",\"status\":202,\"detail\":\"Some message\"}";
         childPacket.BinaryData.ToArray().Should().BeEquivalentTo(Encoding.UTF8.GetBytes(binaryData));
         childPacket.ParentId.Should().Be(packet.Id);
         childPacket.Channel.Should().Be(outgoingChannel + ":Error");
         childPacket.Status.Should().Be(PacketStatus.FatalError);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ProcessPacket_WhenSuccessCodeAndError_SetsError()
     {
-        ValueTask<ConnectorResponse> ExecuteOutgoingRequest(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
+        // Arrange
+        ValueTask<ConnectorResponse> ExecuteOutgoingRequestAsync(ConnectorRequest r, HttpConnectorEndpointConfig e, CancellationToken c)
            => ValueTask.FromResult(ConnectorResponses.HttpPacketTransferContent("Some Message", "plain/text", _metadata.TemplateName, 289, ProcessPacketState.Error));
 
         _template.HttpIncoming = null;
-        var requestContent = "{\"test\":\"request-data\"}";
-        var outgoingChannel = "TestOutgoingChannel";
-
-        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequest);
-
+        const string requestContent = "{\"test\":\"request-data\"}";
+        const string outgoingChannel = "TestOutgoingChannel";
+        
+        // Act
+        var response = await ProcessOutgoingPacketAsync(requestContent, outgoingChannel, ExecuteOutgoingRequestAsync);
+        
+        // Assert
         // Verify the response
         response.Http.Should().NotBeNull();
         response.Http!.StatusCode.Should().Be(289);
@@ -255,17 +271,17 @@ public class OutgoingPacketTests
         packet.Channel.Should().Be(outgoingChannel);
         packet.Status.Should().Be(PacketStatus.Error);
 
-        var binaryData = "Request failed with status code 289. Response Content: Some Message";
-
+        const string binaryData = "Request failed with status code 289. Response Content: Some Message";
         childPacket.BinaryData.ToArray().Should().BeEquivalentTo(Encoding.UTF8.GetBytes(binaryData));
         childPacket.ParentId.Should().Be(packet.Id);
         childPacket.Channel.Should().Be(outgoingChannel + ":Error");
         childPacket.Status.Should().Be(PacketStatus.FatalError);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ProcessPacket_WhenOverridden_UseCustomHandler()
     {
+        // Arrange
         // Initialize HttpConnectorFeature
         var endpoint = new HttpConnectorEndpointConfig { Path = "/api/test", HttpMethod = "POST", Topic = "TestTopic" };
         _httpOutgoingConfig.Endpoints.Add("TestEndpoint", endpoint);
@@ -276,9 +292,9 @@ public class OutgoingPacketTests
             ConnectorName = "TestHttpConnector"
         };
 
-        var outgoingChannel = "TestOutgoingChannel";
+        const string outgoingChannel = "TestOutgoingChannel";
         var httpOutgoingHandlerWasInvoked = false;
-        var options = new HttpPacketTransferOptions(outgoingChanel: outgoingChannel, processOutgoingPacketDelegate: (p, c) =>
+        var options = new HttpPacketTransferOptions(outgoingChanel: outgoingChannel, processOutgoingPacketDelegate: (_, _) =>
         {
             httpOutgoingHandlerWasInvoked = true;
             return ValueTask.FromResult(ConnectorResponses.HttpOk("TestHttpConnector"));
@@ -291,9 +307,12 @@ public class OutgoingPacketTests
 
         // Start the feature
         await _httpConnectorFeature.StartAsync(_cancellationTokenSource.Token);
-
+        
+        // Act
         // Send outgoing connector request
         var responses = await _messenger.AskAsync<ConnectorRequest, ConnectorResponse>(endpoint.Topic, request);
+        
+        // Assert
         responses.Should().ContainSingle();
 
         // Verify the response
@@ -369,7 +388,7 @@ public class OutgoingPacketTests
             .AndDoes(x => _packets.Add(x.Arg<PacketData>()));
         _packetCreateBuilder
             .CreateAsync(Arg.Any<CancellationToken>())
-            .Returns(x => [.. _packets]);
+            .Returns(_ => [.. _packets]);
 
         // Mock packet repository update
         _packetUpdateBuilder
@@ -389,16 +408,12 @@ public class OutgoingPacketTests
             .Returns(_packetQueryBuilder);
         _packetQueryBuilder
             .GetAsync(Arg.Any<CancellationToken>())
-            .Returns(x => [.. _packets]);
+            .Returns(_ => [.. _packets]);
 
         _packetRepository.Create().Returns(_packetCreateBuilder);
         _packetRepository.Update().Returns(_packetUpdateBuilder);
         _packetRepository.Query().Returns(_packetQueryBuilder);
     }
 
-    [TestCleanup]
-    public async Task TestCleanup()
-    {
-        await _cancellationTokenSource.CancelAsync();
-    }
+    public async ValueTask DisposeAsync() => await _cancellationTokenSource.CancelAsync();
 }

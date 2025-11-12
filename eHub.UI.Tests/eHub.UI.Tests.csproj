@@ -4,15 +4,7 @@
         <TargetFramework>net9.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-
-        <IsPackable>false</IsPackable>
-
-        <RootNamespace>eHub.UI.Tests</RootNamespace>
     </PropertyGroup>
-
-    <ItemGroup>
-        <PackageReference Include="NSubstitute" />
-    </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\eHub.UI\eHub.UI.csproj" />

@@ -3,17 +3,14 @@ using eHub.PlugIn.Configuration;
 using eHub.Scripting.Connectors.Features;
 using eController.Util.Configuration;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace eHub.Tests.Connectors.DependencySetup;
 
-[TestClass]
 public class DependencySetupTests
 {
-    [TestMethod]
-    public void
-        GivenConnectorImplementsISetupDependenciesConnector_WhenSetupDependenciesCalled_ThenDependenciesAreAvailable()
+    [Fact]
+    public void GivenConnectorImplementsISetupDependenciesConnector_WhenSetupDependenciesCalled_ThenDependenciesAreAvailable()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -29,17 +26,15 @@ public class DependencySetupTests
         dependency.Value.Should().Be(42);
     }
 
-    [TestMethod]
-    public void
-        GivenInheritedConnectorWhereBaseImplementsISetupDependenciesConnector_WhenSetupDependenciesCalled_ThenDependenciesAreAvailable()
+    [Fact]
+    public void GivenInheritedConnectorWhereBaseImplementsISetupDependenciesConnector_WhenSetupDependenciesCalled_ThenDependenciesAreAvailable()
     {
         // Arrange
         var services = new ServiceCollection();
         var configuration = NullConfiguration.Instance;
 
         // Act
-        DependencyInjectionFeature.InvokeDependencySetup(typeof(InheritedTestConnectorWithoutRedeclaration), services,
-            configuration);
+        DependencyInjectionFeature.InvokeDependencySetup(typeof(InheritedTestConnectorWithoutRedeclaration), services, configuration);
 
         // Assert
         var serviceProvider = services.BuildServiceProvider();
@@ -48,17 +43,15 @@ public class DependencySetupTests
         dependency.Value.Should().Be(42);
     }
 
-    [TestMethod]
-    public void
-        GivenInheritedConnectorWhereConnectorReImplementsISetupDependenciesConnector_WhenSetupDependenciesCalled_ThenDependenciesAreAvailable()
+    [Fact]
+    public void GivenInheritedConnectorWhereConnectorReimplementsISetupDependenciesConnector_WhenSetupDependenciesCalled_ThenDependenciesAreAvailable()
     {
         // Arrange
         var services = new ServiceCollection();
         var configuration = NullConfiguration.Instance;
 
         // Act
-        DependencyInjectionFeature.InvokeDependencySetup(typeof(InheritedTestConnectorWithRedeclaration), services,
-            configuration);
+        DependencyInjectionFeature.InvokeDependencySetup(typeof(InheritedTestConnectorWithRedeclaration), services, configuration);
 
         // Assert
         var serviceProvider = services.BuildServiceProvider();

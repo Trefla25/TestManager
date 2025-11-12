@@ -15,6 +15,7 @@ using eHub.Tests.Helper;
 using ElementLogic.Configuration.Client;
 using eMessenger.Tests;
 using ePlugin.Engine.Client;
+using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,10 +23,10 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using Xunit.Sdk;
 
 namespace eHub.Tests.Connectors.PacketTransfer;
 
-[TestClass]
 public class PacketDispatcherTests
 {
     private const int TestTimeout = 100_000;
@@ -38,15 +39,14 @@ public class PacketDispatcherTests
     private AwaitablePacketsConnector? _testConnector;
     private PacketTransferFeature? _packetTransferCore;
     private Task? _ptcWork;
-    private readonly string _runId;
     private readonly string _connectionString;
 
     public PacketDispatcherTests()
     {
         _cts = new CancellationTokenSource();
 
-        _runId = Guid.NewGuid().ToString();
-        _connectionString = $"Data Source={_runId};Mode=Memory;Cache=Shared";
+        var runId = Guid.NewGuid().ToString();
+        _connectionString = $"Data Source={runId};Mode=Memory;Cache=Shared";
     }
 
     [MemberNotNull(nameof(_testConnector), nameof(_packetTransferCore), nameof(_ptcWork))]
@@ -115,124 +115,132 @@ public class PacketDispatcherTests
         _ptcWork = _packetTransferCore.StartAsync(_cts.Token);
     }
 
-    async Task WaitForElements(int count)
+    private async Task WaitForElementsAsync(int count)
     {
         var sw = Stopwatch.StartNew();
         while (_testConnector!.ProcessRun.Count < count)
         {
             if (sw.Elapsed > TimeSpan.FromMilliseconds(WaitForElementsTimeout))
             {
-                Assert.Fail($"Timeout waiting for {count} elements");
+                throw new XunitException($"Timeout waiting for {count} elements");
             }
             await Task.Delay(TimeSpan.FromMilliseconds(100));
         }
     }
 
-    [TestMethod]
-    [Timeout(TestTimeout)]
+    [Fact(Timeout = TestTimeout)]
     public async Task TestSequentialPacketMode()
     {
+        // Arrange
         SetupTransfer(ChannelMode.Sequential);
 
+        // Act
         Console.WriteLine("Adding packets");
         await _testConnector.SimulatePacket("1", "A");
         await _testConnector.SimulatePacket("2", "A");
         await _testConnector.SimulatePacket("3", "A");
 
         Console.WriteLine("Process pkg 1");
-        await WaitForElements(1);
-        CollectionAssert.AreEquivalent((string[])["1"], _testConnector.ProcessRun.ToArray());
+        await WaitForElementsAsync(1);
+        
+        // Assert
+        _testConnector.ProcessRun.ToArray().Should().BeEquivalentTo(new[] { "1" });
 
         Console.WriteLine("Process pkg 2");
         _testConnector.ProcessedPackets["1"].SetResult();
-        await WaitForElements(2);
-        CollectionAssert.AreEquivalent((string[])["1", "2"], _testConnector.ProcessRun.ToArray());
+        await WaitForElementsAsync(2);
+        _testConnector.ProcessRun.ToArray().Should().BeEquivalentTo(new[] { "1", "2" });
 
         Console.WriteLine("Process pkg 3");
         _testConnector.ProcessedPackets["2"].SetResult();
-        await WaitForElements(3);
-        CollectionAssert.AreEquivalent((string[])["1", "2", "3"], _testConnector.ProcessRun.ToArray());
+        await WaitForElementsAsync(3);
+        _testConnector.ProcessRun.ToArray().Should().BeEquivalentTo(new[] { "1", "2", "3" });
 
         _testConnector.ProcessedPackets["3"].SetResult();
 
-        await Task.Delay(TimeSpan.FromSeconds(0.1));
+        await Task.Delay(TimeSpan.FromSeconds(0.1), _cts.Token);
 
-        _cts.Cancel();
+        await _cts.CancelAsync();
         await _ptcWork;
     }
 
 
-    [TestMethod]
-    [Timeout(TestTimeout)]
+    [Fact(Timeout = TestTimeout)]
     public async Task TestSequentialPacketModeReverse()
     {
+        // Arrange
         SetupTransfer(ChannelMode.Sequential);
 
+        // Act
         Console.WriteLine("Adding packets");
         await _testConnector.SimulatePacket("1", "A");
         await _testConnector.SimulatePacket("2", "A");
         await _testConnector.SimulatePacket("3", "A");
-
         // Complete in reverse order to test if the order is maintained
 
-        await WaitForElements(1);
-        CollectionAssert.AreEquivalent((string[])["1"], _testConnector.ProcessRun.ToArray());
+        await WaitForElementsAsync(1);
+        
+        // Assert
+        _testConnector.ProcessRun.ToArray().Should().BeEquivalentTo(new[] { "1" });
 
         Console.WriteLine("Trigger process 2 & 3");
         _testConnector.ProcessedPackets["3"].SetResult();
         _testConnector.ProcessedPackets["2"].SetResult();
         await Task.Delay(TimeSpan.FromSeconds(0.1));
-        CollectionAssert.AreEquivalent((string[])["1"], _testConnector.ProcessRun.ToArray());
+        _testConnector.ProcessRun.ToArray().Should().BeEquivalentTo(new[] { "1" });
 
         Console.WriteLine("Trigger process 1");
         _testConnector.ProcessedPackets["1"].SetResult();
-        await WaitForElements(3);
-        CollectionAssert.AreEquivalent((string[])["1", "2", "3"], _testConnector.ProcessRun.ToArray());
+        await WaitForElementsAsync(3);
+        _testConnector.ProcessRun.ToArray().Should().BeEquivalentTo(new[] { "1", "2", "3" });
 
-        _cts.Cancel();
+        await _cts.CancelAsync();
         await _ptcWork;
     }
 
 
-    [TestMethod]
-    [Timeout(TestTimeout)]
+    [Fact(Timeout = TestTimeout)]
     public async Task TestConcurrentPacketMode()
     {
+        // Arrange
         SetupTransfer(ChannelMode.Concurrent);
 
+        // Act
         Console.WriteLine("Adding packets");
         await _testConnector.SimulatePacket("1", "A");
         await _testConnector.SimulatePacket("2", "A");
         await _testConnector.SimulatePacket("3", "A");
         await _testConnector.SimulatePacket("4", "A");
-
         // All 4 packets should be processed at the same time
 
-        await WaitForElements(4);
-        CollectionAssert.AreEquivalent((string[])["1", "2", "3", "4"], _testConnector.ProcessRun.ToArray());
+        await WaitForElementsAsync(4);
+        
+        // Assert
+        _testConnector.ProcessRun.ToArray().Should().BeEquivalentTo(new[] { "1", "2", "3", "4" });
 
         _testConnector.ProcessedPackets["1"].SetResult();
         _testConnector.ProcessedPackets["2"].SetResult();
         _testConnector.ProcessedPackets["3"].SetResult();
         _testConnector.ProcessedPackets["4"].SetResult();
 
-        await WaitForElements(4);
-        await Task.Delay(TimeSpan.FromSeconds(0.1));
-        CollectionAssert.AreEquivalent((string[])["1", "2", "3", "4"], _testConnector.ProcessRun.ToArray());
+        await WaitForElementsAsync(4);
+        await Task.Delay(TimeSpan.FromSeconds(0.1), _cts.Token);
+        _testConnector.ProcessRun.ToArray().Should().BeEquivalentTo(new[] { "1", "2", "3", "4" });
 
         // TODO we should also test if all packets have been properly written to the database
 
-        _cts.Cancel();
+        await _cts.CancelAsync();
         await _ptcWork;
     }
 
 
-    [TestMethod]
-    [Timeout(TestTimeout)]
+    [Fact(Timeout = TestTimeout)]
     public async Task TestConcurrentPacketModeMaxParallelism()
     {
+        // Arrange
         SetupTransfer(ChannelMode.Concurrent);
 
+        // Act
         Console.WriteLine("Adding packets");
         for (var i = 0; i < 20; i++)
         {
@@ -240,9 +248,11 @@ public class PacketDispatcherTests
         }
 
         // We should have 10 packets processed at the same time
-        await WaitForElements(10);
-        await Task.Delay(TimeSpan.FromSeconds(0.1));
-        Assert.AreEqual(10, _testConnector.ProcessRun.Count);
+        await WaitForElementsAsync(10);
+        await Task.Delay(TimeSpan.FromSeconds(0.1), _cts.Token);
+        
+        // Assert
+        _testConnector.ProcessRun.Count.Should().Be(10);
 
         // Complete first 5 packets
 
@@ -252,9 +262,9 @@ public class PacketDispatcherTests
         }
 
         // We should have 15 packets processed at the same time
-        await WaitForElements(15);
-        await Task.Delay(TimeSpan.FromSeconds(0.1));
-        Assert.AreEqual(15, _testConnector.ProcessRun.Count);
+        await WaitForElementsAsync(15);
+        await Task.Delay(TimeSpan.FromSeconds(0.1), _cts.Token);
+        _testConnector.ProcessRun.Count.Should().Be(15);
 
         // Complete the rest of the packets
 
@@ -264,21 +274,22 @@ public class PacketDispatcherTests
         }
 
         // We should have all 20 packets processed
-        await WaitForElements(20);
-        await Task.Delay(TimeSpan.FromSeconds(0.1));
-        Assert.AreEqual(20, _testConnector.ProcessRun.Count);
+        await WaitForElementsAsync(20);
+        await Task.Delay(TimeSpan.FromSeconds(0.1), _cts.Token);
+        _testConnector.ProcessRun.Count.Should().Be(20);
 
-        _cts.Cancel();
+        await _cts.CancelAsync();
         await _ptcWork;
     }
 
 
-    [TestMethod]
-    [Timeout(TestTimeout)]
+    [Fact(Timeout = TestTimeout)]
     public async Task TestWithInnerDbAccess()
     {
+        // Arrange
         SetupTransfer(ChannelMode.Sequential);
 
+        // Act
         _testConnector.SimulateProcess += async (packet, cancellationToken) =>
         {
             var name = Encoding.UTF8.GetString(packet.BinaryData.Span);
@@ -292,10 +303,10 @@ public class PacketDispatcherTests
 
         Console.WriteLine("Adding packets");
         await _testConnector.SimulatePacket("1", "A");
-
-        await WaitForElements(2);
-
-        CollectionAssert.AreEquivalent((string[])["1", "1b"], _testConnector.ProcessRun.ToArray());
+        await WaitForElementsAsync(2);
+        
+        // Assert
+        _testConnector.ProcessRun.ToArray().Should().BeEquivalentTo(new[] { "1", "1b" });
     }
 }
 

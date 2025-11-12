@@ -9,24 +9,26 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace eHub.Tests.Authentication;
 
-[TestClass]
 public class AuthenticationExtensionsTests
 {
-    [TestMethod]
+    [Fact]
     public void AddEHubAuthentication_WhenDisabled_DoesNothing()
     {
+        // Arrange
         var authConfig = new AuthenticationConfig { Enabled = false };
-
         var services = new ServiceCollection();
 
+        // Act
         services.AddEHubAuthentication(authConfig);
-
+        
+        // Assert
         services.Count.Should().Be(0);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task AddEHubAuthentication_WithBasic_RegistersUserServiceAndBasicScheme()
     {
+        // Arrange
         var authConfig = new AuthenticationConfig
         {
             Enabled = true,
@@ -38,15 +40,18 @@ public class AuthenticationExtensionsTests
                 ]
             }
         };
-
+        
         var services = new ServiceCollection();
 
+        // Act
         services.AddEHubAuthentication(authConfig);
+        
+        // Assert
         var provider = services.BuildServiceProvider();
 
         var schemeProvider = provider.GetRequiredService<IAuthenticationSchemeProvider>();
         var schemes = await schemeProvider.GetAllSchemesAsync();
-
+        
         schemes.Should().Contain(s => s.Name == BasicAuthenticationHandler.SchemeName);
         provider.GetService<IUserService>().Should().NotBeNull();
 
@@ -55,9 +60,10 @@ public class AuthenticationExtensionsTests
         defaultPolicy.AuthenticationSchemes.Should().Contain(BasicAuthenticationHandler.SchemeName);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task AddEHubAuthentication_WithJWT_RegistersJwtBearerScheme()
     {
+        // Arrange
         var authConfig = new AuthenticationConfig
         {
             Enabled = true,
@@ -67,10 +73,13 @@ public class AuthenticationExtensionsTests
                 Audience = "my-audience"
             }
         };
-
+        
         var services = new ServiceCollection();
 
+        // Act
         services.AddEHubAuthentication(authConfig);
+
+        // Assert
         var provider = services.BuildServiceProvider();
 
         var schemeProvider = provider.GetRequiredService<IAuthenticationSchemeProvider>();
@@ -83,16 +92,17 @@ public class AuthenticationExtensionsTests
         defaultPolicy.AuthenticationSchemes.Should().Contain(JwtBearerDefaults.AuthenticationScheme);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task AddEHubAuthentication_WithSignatureParameter_RegistersSignatureScheme()
     {
+        // Arrange
         var authConfig = new AuthenticationConfig
         {
             Enabled = true,
             Basic = null,
             JWT = null
         };
-
+        
         var services = new ServiceCollection();
 
         var signatureAuthScheme = new AuthenticationSchemeConfig
@@ -102,8 +112,11 @@ public class AuthenticationExtensionsTests
 
         signatureAuthScheme.SetHandler<SignatureAuthenticationHandler, AuthenticationSchemeOptions>();
         authConfig.Schemes.Add(signatureAuthScheme);
-
+        
+        // Act
         services.AddEHubAuthentication(authConfig);
+        
+        // Assert
         var provider = services.BuildServiceProvider();
 
         var schemeProvider = provider.GetRequiredService<IAuthenticationSchemeProvider>();
@@ -112,9 +125,10 @@ public class AuthenticationExtensionsTests
         schemes.Should().Contain(s => s.Name == SignatureAuthenticationHandler.SchemeName);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task AddEHubAuthentication_WithBasicAndJWTAndSignature_RegistersAllExpectedSchemes()
     {
+        // Arrange
         var authConfig = new AuthenticationConfig
         {
             Enabled = true,
@@ -141,15 +155,19 @@ public class AuthenticationExtensionsTests
 
         signatureAuthScheme.SetHandler<SignatureAuthenticationHandler, AuthenticationSchemeOptions>();
         authConfig.Schemes.Add(signatureAuthScheme);
-
+        
+        // Act
         services.AddEHubAuthentication(authConfig);
+        
+        // Assert
         var provider = services.BuildServiceProvider();
         var schemeProvider = provider.GetRequiredService<IAuthenticationSchemeProvider>();
         var schemes = await schemeProvider.GetAllSchemesAsync();
+        var schemeArray = schemes.ToArray();
 
-        schemes.Should().Contain(s => s.Name == BasicAuthenticationHandler.SchemeName);
-        schemes.Should().Contain(s => s.Name == JwtBearerDefaults.AuthenticationScheme);
-        schemes.Should().Contain(s => s.Name == SignatureAuthenticationHandler.SchemeName);
+        schemeArray.Should().Contain(s => s.Name == BasicAuthenticationHandler.SchemeName);
+        schemeArray.Should().Contain(s => s.Name == JwtBearerDefaults.AuthenticationScheme);
+        schemeArray.Should().Contain(s => s.Name == SignatureAuthenticationHandler.SchemeName);
 
         var policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
         var defaultPolicy = await policyProvider.GetDefaultPolicyAsync();
@@ -159,9 +177,10 @@ public class AuthenticationExtensionsTests
         ]);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task AddEHubAuthentication_NoConfigAndNoExtraSchemes_DefaultPolicyIsEmpty()
     {
+        // Arrange
         var authConfig = new AuthenticationConfig
         {
             Enabled = true,
@@ -170,52 +189,26 @@ public class AuthenticationExtensionsTests
         };
 
         var services = new ServiceCollection();
-
+        
+        // Act
         services.AddEHubAuthentication(authConfig);
+        
+        // Assert
         var provider = services.BuildServiceProvider();
         var schemeProvider = provider.GetRequiredService<IAuthenticationSchemeProvider>();
         var schemes = await schemeProvider.GetAllSchemesAsync();
         var policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
         var defaultPolicy = await policyProvider.GetDefaultPolicyAsync();
-
+        
         schemes.Should().BeEmpty();
         defaultPolicy.AuthenticationSchemes.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public void AddEHubAuthentication_MultipleCalls_ShouldThrowException()
     {
+        // Arrange
         var authConfig = new AuthenticationConfig
-        {
-            Enabled = true,
-            Basic = new BasicAuthenticationConfig
-            {
-                DummyUsers = new[] { new DummyUser { Username = "Alice", Password = "password123" } }
-            },
-            JWT = new JWTAuthenticationConfig
-            {
-                Authority = "https://example.com",
-                Audience = "test"
-            }
-        };
-        var services = new ServiceCollection();
-
-        services.AddEHubAuthentication(authConfig);
-        services.AddEHubAuthentication(authConfig);
-        Action act = () =>
-        {
-            var provider = services.BuildServiceProvider();
-            provider.GetRequiredService<IAuthenticationSchemeProvider>();
-        };
-
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*BasicAuthentication*");
-    }
-
-    [TestMethod]
-    public void AddEHubAuthentication_MultipleCall_ThrowsException()
-    {
-        var authConfigExample = new AuthenticationConfig
         {
             Enabled = true,
             Basic = new BasicAuthenticationConfig
@@ -225,34 +218,23 @@ public class AuthenticationExtensionsTests
             JWT = new JWTAuthenticationConfig
             {
                 Authority = "https://example.com",
-                Audience = "example"
-            }
-        };
-
-        var authConfigTest = new AuthenticationConfig
-        {
-            Enabled = true,
-            Basic = new BasicAuthenticationConfig
-            {
-                DummyUsers = [new DummyUser { Username = "Wonderland", Password = "321password" }]
-            },
-            JWT = new JWTAuthenticationConfig
-            {
-                Authority = "https://test.com",
                 Audience = "test"
             }
         };
-
         var services = new ServiceCollection();
-        services.AddEHubAuthentication(authConfigExample);
-        services.AddEHubAuthentication(authConfigTest);
 
-        Action act = () =>
+        // Act
+        services.AddEHubAuthentication(authConfig);
+        services.AddEHubAuthentication(authConfig);
+        var act = () =>
         {
             var provider = services.BuildServiceProvider();
             provider.GetRequiredService<IAuthenticationSchemeProvider>();
         };
-
-        act.Should().Throw<InvalidOperationException>().WithMessage("*BasicAuthentication*");
+        
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*BasicAuthentication*");
     }
 }
+

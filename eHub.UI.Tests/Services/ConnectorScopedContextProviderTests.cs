@@ -5,12 +5,11 @@ using eHub.UI.State;
 using eMessenger;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
+using Xunit;
 
 namespace eHub.UI.Tests.Services;
 
-[TestClass]
 public class ConnectorScopedContextProviderTests
 {
     private IConnectorContextProvider _contextProvider = default!;
@@ -19,8 +18,7 @@ public class ConnectorScopedContextProviderTests
     private ILoggerFactory _loggerFactory = default!;
     private ConnectorScopedContextProvider _provider = default!;
 
-    [TestInitialize]
-    public void Setup()
+    public ConnectorScopedContextProviderTests()
     {
         _contextProvider = Substitute.For<IConnectorContextProvider>();
         _registry = Substitute.For<IConnectorRegistry>();
@@ -30,9 +28,10 @@ public class ConnectorScopedContextProviderTests
         _provider = new ConnectorScopedContextProvider(_contextProvider, _registry, _messenger, _loggerFactory);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetConnectorScopedContext_WhenConnectorTypeIsCustomUIView_ReturnsCombinedConnectorScopedContext()
     {
+        // Arrange
         var connectorIdentifier = new ConnectorIdentifier("Test", "TestConnector");
         var connectorContext = Substitute.For<IConnectorContext>();
         var connectorUiData = new ConnectorUiData("TestConnector", "TestConnector", new UIViewConfig())
@@ -40,20 +39,21 @@ public class ConnectorScopedContextProviderTests
             ConnectorType = UIViewConfig.CustomUIViewType
         };
 
+        // Act
         _contextProvider.GetConnectorContext(connectorIdentifier).Returns(connectorContext);
         _registry.ActiveConnectors.Returns(new Dictionary<ConnectorIdentifier, ConnectorUiData>
             {
                 { connectorIdentifier, connectorUiData }
             });
-
         var result = _provider.GetConnectorScopedContext(connectorIdentifier);
-
+        // Assert
         result.Should().BeOfType<CombinedConnectorScopedContext>();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetConnectorScopedContext_WhenConnectorTypeIsNotCustomUIView_ReturnsConnectorScopedContext_()
     {
+        // Arrange
         var connectorIdentifier = new ConnectorIdentifier("Test", "TestConnector");
         var connectorContext = Substitute.For<IConnectorContext>();
         var connectorUiData = new ConnectorUiData("TestConnector", "TestConnector", new UIViewConfig())
@@ -61,25 +61,26 @@ public class ConnectorScopedContextProviderTests
             ConnectorType = "StandardView"
         };
 
+        // Act
         _contextProvider.GetConnectorContext(connectorIdentifier).Returns(connectorContext);
         _registry.ActiveConnectors.Returns(new Dictionary<ConnectorIdentifier, ConnectorUiData>
             {
                 { connectorIdentifier, connectorUiData }
             });
-
         var result = _provider.GetConnectorScopedContext(connectorIdentifier);
-
+        // Assert
         result.Should().BeOfType<ConnectorScopedContext>();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetConnectorScopedContext_WhenConnectorIsNotInRegistry_ThrowsKeyNotFoundException()
     {
+        // Arrange
         var connectorIdentifier = new ConnectorIdentifier("Test", "MissingConnector");
         _registry.ActiveConnectors.Returns(new Dictionary<ConnectorIdentifier, ConnectorUiData>());
-
+        // Act
         var act = () => _provider.GetConnectorScopedContext(connectorIdentifier);
-
+        // Assert
         act.Should().Throw<KeyNotFoundException>();
     }
 }

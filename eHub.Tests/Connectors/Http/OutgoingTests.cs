@@ -19,27 +19,25 @@ using eHub.Tests.Helper;
 
 namespace eHub.Tests.Connectors.Http;
 
-[TestClass]
-public class OutgoingTests
+public class OutgoingTests : IAsyncLifetime
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
 
     private WebApplication? _server;
-    private HttpConnectorFeature _httpConnectorFeature = default!;
-    private ConnectorMetadata _metadata = default!;
-    private ConnectorTemplate _template = default!;
-    private HttpOutgoing _httpOutgoingConfig = default!;
+    private HttpConnectorFeature _httpConnectorFeature = null!;
+    private ConnectorMetadata _metadata = null!;
+    private ConnectorTemplate _template = null!;
+    private HttpOutgoing _httpOutgoingConfig = null!;
 
-    private IHttpConnector _httpConnector = default!;
-    private IServiceProvider _serviceProvider = default!;
-    private ILoggerFactory _loggerFactory = default!;
-    private ILogger<HttpConnectorFeature> _logger = default!;
-    private IConfiguration _configuration = default!;
-    private IScopedMessenger _messenger = default!;
-    private IHttpClientFactory _httpClientFactory = default!;
+    private IHttpConnector _httpConnector = null!;
+    private IServiceProvider _serviceProvider = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private ILogger<HttpConnectorFeature> _logger = null!;
+    private IConfiguration _configuration = null!;
+    private IScopedMessenger _messenger = null!;
+    private IHttpClientFactory _httpClientFactory = null!;
 
-    [TestInitialize]
-    public void TestInitialize()
+    public ValueTask InitializeAsync()
     {
         _httpConnector = Substitute.For<IHttpConnector>();
         _serviceProvider = Substitute.For<IServiceProvider>();
@@ -60,92 +58,112 @@ public class OutgoingTests
             Enabled = true,
             HttpOutgoing = _httpOutgoingConfig
         };
+
+        return ValueTask.CompletedTask;
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WhenCalled_RegistersAllEndpoints()
     {
-        var endpoints = new HttpConnectorEndpointConfig[] {
-            new (){ Path = "/api/test", HttpMethod = "POST", Topic = "PostEndpoint" },
-            new (){ Path = "/api/test", HttpMethod = "GET", Topic = "GetEndpoint" },
-            new (){ Path = "/api/test", HttpMethod = "PUT", Topic = "PutEndpoint" },
-            new (){ Path = "/api/test", HttpMethod = "DELETE", Topic = "DeleteEndpoint" },
-            new (){ Path = "/api/test", HttpMethod = "PATCH", Topic = "PatchEndpoint" },
-            new (){ Topic = "EmptyEndpoint" },
+        // Arrange
+        var endpoints = new HttpConnectorEndpointConfig[]
+        {
+            new() { Path = "/api/test", HttpMethod = "POST", Topic = "PostEndpoint" },
+            new() { Path = "/api/test", HttpMethod = "GET", Topic = "GetEndpoint" },
+            new() { Path = "/api/test", HttpMethod = "PUT", Topic = "PutEndpoint" },
+            new() { Path = "/api/test", HttpMethod = "DELETE", Topic = "DeleteEndpoint" },
+            new() { Path = "/api/test", HttpMethod = "PATCH", Topic = "PatchEndpoint" },
+            new() { Topic = "EmptyEndpoint" },
         };
-
+        
         _httpOutgoingConfig.Endpoints.AddRange(endpoints.Select(e => KeyValuePair.Create(e.Topic!, e)));
 
         _httpConnector.HttpConnectorOptions.Returns(new HttpConnectorOptions());
 
-        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration, _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
-        await _httpConnectorFeature.StartAsync(_cancellationTokenSource.Token);
+        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration,
+            _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
 
+        // Act
+        await _httpConnectorFeature.StartAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         // Verify that AnswerAsync was called for each expected topic
         foreach (var endpoint in endpoints)
         {
-            await _messenger.Received(1).AnswerAsync(endpoint.Topic!, Arg.Any<Func<ConnectorRequest, ValueTask<ConnectorResponse>>>());
+            await _messenger.Received(1).AnswerAsync(endpoint.Topic!,
+                Arg.Any<Func<ConnectorRequest, ValueTask<ConnectorResponse>>>());
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_OnPost_ReturnsExpectedResponse()
     {
+        // Arrange
         var request = new ConnectorRequest(
             content: Encoding.UTF8.GetBytes("{\"test\":\"post-data\"}"),
             contentType: MediaTypeNames.Application.Json,
             connectorName: "MyConnector");
-
-        await TestOutgoingHttpRequest(request, HttpMethods.Post);
+        
+        // Act & Assert
+        await TestOutgoingHttpRequestAsync(request, HttpMethods.Post);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_OnGet_ReturnsExpectedResponse()
     {
+        // Arrange
         var request = new ConnectorRequest(
             content: ReadOnlyMemory<byte>.Empty,
             contentType: MediaTypeNames.Application.Octet,
             connectorName: "MyConnector");
-
-        await TestOutgoingHttpRequest(request, HttpMethods.Get);
+        
+        // Act & Assert
+        await TestOutgoingHttpRequestAsync(request, HttpMethods.Get);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_OnPut_ReturnsExpectedResponse()
     {
+        // Arrange
         var request = new ConnectorRequest(
             content: Encoding.UTF8.GetBytes("{\"test\":\"put-data\"}"),
             contentType: MediaTypeNames.Application.Json,
             connectorName: "MyConnector");
-
-        await TestOutgoingHttpRequest(request, HttpMethods.Put);
+        
+        // Act & Assert
+        await TestOutgoingHttpRequestAsync(request, HttpMethods.Put);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_OnDelete_ReturnsExpectedResponse()
     {
+        // Arrange
         var request = new ConnectorRequest(
             content: ReadOnlyMemory<byte>.Empty,
             contentType: MediaTypeNames.Application.Octet,
             connectorName: "MyConnector");
-
-        await TestOutgoingHttpRequest(request, HttpMethods.Delete);
+        
+        // Act & Assert
+        await TestOutgoingHttpRequestAsync(request, HttpMethods.Delete);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_OnPatch_ReturnsExpectedResponse()
     {
+        // Arrange
         var request = new ConnectorRequest(
             content: Encoding.UTF8.GetBytes("{\"test\":\"patch-data\"}"),
             contentType: MediaTypeNames.Application.Json,
             connectorName: "MyConnector");
-
-        await TestOutgoingHttpRequest(request, HttpMethods.Patch);
+        
+        // Act & Assert
+        await TestOutgoingHttpRequestAsync(request, HttpMethods.Patch);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_WithHeaders_AllAreForwarded()
     {
+        // Arrange
         var headers = new Dictionary<string, StringValues>
         {
             { "Token", Guid.NewGuid().ToString() },
@@ -153,19 +171,21 @@ public class OutgoingTests
             { "X-Test-Header", "test-value" },
             { "X-Multiple-Header", new StringValues(["value1", "value2", "value3"]) },
         };
-
+        
         var request = new ConnectorRequest(
             content: Encoding.UTF8.GetBytes("{\"test\":\"test-data\"}"),
             contentType: MediaTypeNames.Application.Json,
             connectorName: "MyConnector",
             http: new("/api/test", "POST", null, headers));
-
-        await TestOutgoingHttpRequest(request, HttpMethods.Post);
+        
+        // Act & Assert
+        await TestOutgoingHttpRequestAsync(request, HttpMethods.Post);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_WithQuery_AllAreForwarded()
     {
+        // Arrange
         var query = new Dictionary<string, StringValues>
         {
             { "search", "example" },
@@ -179,13 +199,15 @@ public class OutgoingTests
             connectorName: "MyConnector",
             http: new("/api/test", "POST", null, null, query)
         );
-
-        await TestOutgoingHttpRequest(request, HttpMethods.Post);
+        
+        // Act & Assert
+        await TestOutgoingHttpRequestAsync(request, HttpMethods.Post);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_WithRouteParameters_AllAreForwarded()
     {
+        // Arrange
         var routeParameters = new Dictionary<string, string>()
         {
             { "param1", "2" },
@@ -197,13 +219,15 @@ public class OutgoingTests
             contentType: MediaTypeNames.Application.Json,
             connectorName: "MyConnector",
             http: new("/api/test/2/TestConnector", "POST", routeParameters));
-
-        await TestOutgoingHttpRequest(request, HttpMethods.Post, "/api/test/{param1}/{param2}");
+        
+        // Act & Assert
+        await TestOutgoingHttpRequestAsync(request, HttpMethods.Post, "/api/test/{param1}/{param2}");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_WithCommunicationErrorResend_Returns202AndError()
     {
+        // Arrange
         var connectorRequest = new ConnectorRequest(
             content: Encoding.UTF8.GetBytes("{\"test\":\"test-data\"}"),
             contentType: MediaTypeNames.Application.Json,
@@ -211,21 +235,25 @@ public class OutgoingTests
 
         // Initialize HttpConnectorFeature
         var unusedPort = NetworkHelper.GetRandomUnusedPort();
-        _httpOutgoingConfig.Endpoints.Add("TestEndpoint", new() { Topic = "TestTopic", Path = $"http://localhost:{unusedPort}/test", HttpMethod = "POST" });
+        _httpOutgoingConfig.Endpoints.Add("TestEndpoint",
+            new() { Topic = "TestTopic", Path = $"http://localhost:{unusedPort}/test", HttpMethod = "POST" });
         _httpOutgoingConfig.Endpoints["TestEndpoint"].ResendPacketsOnCommunicationError = true;
 
         var failingHttpClient = new HttpClient(new FailingHttpMessageHandler());
         _httpClientFactory.CreateClient(Arg.Any<string>()).Returns(failingHttpClient);
-        _httpClientFactory.CreateClient().Returns(failingHttpClient);
         _messenger = TestingMessenger.CreateScoped(_loggerFactory);
         _httpConnector.HttpConnectorOptions.Returns(new HttpConnectorOptions());
-        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration, _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
+        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration,
+            _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
 
         // Start the feature
         await _httpConnectorFeature.StartAsync(_cancellationTokenSource.Token);
-
+        
+        // Act
         // Send outgoing connector request
         var responses = await _messenger.AskAsync<ConnectorRequest, ConnectorResponse>("TestTopic", connectorRequest);
+        
+        // Assert
         responses.Should().ContainSingle();
 
         var response = responses.Single();
@@ -235,9 +263,10 @@ public class OutgoingTests
         response.PacketTransfer.ProcessPacketState.Should().Be(ProcessPacketState.Error);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_WithoutCommunicationErrorResend_Returns502()
     {
+        // Arrange
         var connectorRequest = new ConnectorRequest(
             content: Encoding.UTF8.GetBytes("{\"test\":\"test-data\"}"),
             contentType: MediaTypeNames.Application.Json,
@@ -245,21 +274,25 @@ public class OutgoingTests
 
         // Initialize HttpConnectorFeature
         var unusedPort = NetworkHelper.GetRandomUnusedPort();
-        _httpOutgoingConfig.Endpoints.Add("TestEndpoint", new() { Topic = "TestTopic", Path = $"http://localhost:{unusedPort}/test", HttpMethod = "POST" });
+        _httpOutgoingConfig.Endpoints.Add("TestEndpoint",
+            new() { Topic = "TestTopic", Path = $"http://localhost:{unusedPort}/test", HttpMethod = "POST" });
         _httpOutgoingConfig.Endpoints["TestEndpoint"].ResendPacketsOnCommunicationError = false;
 
         var failingHttpClient = new HttpClient(new FailingHttpMessageHandler());
         _httpClientFactory.CreateClient(Arg.Any<string>()).Returns(failingHttpClient);
-        _httpClientFactory.CreateClient().Returns(failingHttpClient);
         _messenger = TestingMessenger.CreateScoped(_loggerFactory);
         _httpConnector.HttpConnectorOptions.Returns(new HttpConnectorOptions());
-        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration, _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
+        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration,
+            _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
 
         // Start the feature
         await _httpConnectorFeature.StartAsync(_cancellationTokenSource.Token);
-
+        
+        // Act
         // Send outgoing connector request
         var responses = await _messenger.AskAsync<ConnectorRequest, ConnectorResponse>("TestTopic", connectorRequest);
+        
+        // Assert
         responses.Should().ContainSingle();
 
         var response = responses.Single();
@@ -267,9 +300,10 @@ public class OutgoingTests
         response.Http.StatusCode.Should().Be(502);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ExecuteRequest_WhenOverridden_UseCustomHandler()
     {
+        // Arrange
         var connectorRequest = new ConnectorRequest(
             content: Encoding.UTF8.GetBytes("{\"test\":\"test-data\"}"),
             contentType: MediaTypeNames.Application.Json,
@@ -286,13 +320,17 @@ public class OutgoingTests
             return ValueTask.FromResult(ConnectorResponses.HttpOk("TestHttpConnector"));
         }));
 
-        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration, _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
+        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration,
+            _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
 
         // Start the feature
         await _httpConnectorFeature.StartAsync(_cancellationTokenSource.Token);
-
+        
+        // Act
         // Send outgoing connector request
         var responses = await _messenger.AskAsync<ConnectorRequest, ConnectorResponse>("TestTopic", connectorRequest);
+        
+        // Assert
         responses.Should().ContainSingle();
 
         var response = responses.Single();
@@ -304,9 +342,10 @@ public class OutgoingTests
         response.Http!.StatusCode.Should().Be(200);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WithInterpolatedEndpoints_FillsPlaceholders()
     {
+        // Arrange
         var endpoint = new HttpConnectorEndpointConfig
         {
             Path = "/api/{endpointKey}/{connectorName}",
@@ -318,45 +357,56 @@ public class OutgoingTests
         _httpConnector.HttpConnectorOptions.Returns(new HttpConnectorOptions());
 
         // Initialize and start HttpConnectorFeature
-        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration, _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
+        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration,
+            _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
+        
+        // Act
         await _httpConnectorFeature.StartAsync(_cancellationTokenSource.Token);
-
+        
+        // Assert
         _httpOutgoingConfig.Endpoints["TestEndpoint"].Topic.Should().Be("topic/TestEndpoint/TestHttpConnector");
         _httpOutgoingConfig.Endpoints["TestEndpoint"].Path.Should().Be("api/TestEndpoint/TestHttpConnector");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WithAllPlaceholders_FillsPlaceholders()
     {
+        // Arrange
         var endpoint = new HttpConnectorEndpointConfig
         {
             Path = "/api/{endpointKey}/{topic}/{api}/{httpMethod}/{connectorName}/{connectorType}",
             HttpMethod = HttpMethods.Post,
             Topic = "topic/{endpointKey}/{api}/{httpMethod}/{connectorName}/{connectorType}",
-            Api = "testapi"
+            Api = "TestApi"
         };
 
         _httpOutgoingConfig.Endpoints.Add("TestEndpoint", endpoint);
         _httpConnector.HttpConnectorOptions.Returns(new HttpConnectorOptions());
 
         // Initialize and start HttpConnectorFeature
-        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration, _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
+        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration,
+            _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
+        
+        // Act
         await _httpConnectorFeature.StartAsync(_cancellationTokenSource.Token);
-
-        _httpOutgoingConfig.Endpoints["TestEndpoint"].Topic.Should().Be("topic/TestEndpoint/testapi/POST/TestHttpConnector/TestHttpConnectorType");
-        _httpOutgoingConfig.Endpoints["TestEndpoint"].Path.Should().Be("api/TestEndpoint/topic/TestEndpoint/testapi/POST/TestHttpConnector/TestHttpConnectorType/testapi/POST/TestHttpConnector/TestHttpConnectorType");
+        
+        // Assert
+        _httpOutgoingConfig.Endpoints["TestEndpoint"].Topic.Should()
+            .Be("topic/TestEndpoint/TestApi/POST/TestHttpConnector/TestHttpConnectorType");
+        _httpOutgoingConfig.Endpoints["TestEndpoint"].Path.Should().Be(
+            "api/TestEndpoint/topic/TestEndpoint/TestApi/POST/TestHttpConnector/TestHttpConnectorType/TestApi/POST/TestHttpConnector/TestHttpConnectorType");
     }
 
-    private async Task TestOutgoingHttpRequest(ConnectorRequest request, string httpMethod, string? path = null)
+    private async Task TestOutgoingHttpRequestAsync(ConnectorRequest request, string httpMethod, string? path = null)
     {
         // Initialize test server
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions());
         builder.WebHost.UseTestServer();
         _server = builder.Build();
 
-        var responseStatus = StatusCodes.Status200OK;
-        var responseContentType = MediaTypeNames.Application.Json;
-        var responseContent = "{\"test\":\"response-data\"}";
+        const int responseStatus = StatusCodes.Status200OK;
+        const string responseContentType = MediaTypeNames.Application.Json;
+        const string responseContent = "{\"test\":\"response-data\"}";
 
         path ??= "/api/test";
         _server.MapMethods(path, [httpMethod], async (context) =>
@@ -371,10 +421,12 @@ public class OutgoingTests
             {
                 context.Request.Headers[header.Key].Should().BeEquivalentTo(header.Value);
             }
+
             foreach (var routeParameter in request.Http?.RouteParameters ?? new Dictionary<string, string>())
             {
                 context.Request.RouteValues[routeParameter.Key].Should().Be(routeParameter.Value);
             }
+
             foreach (var queryParameter in request.Http?.Query ?? new Dictionary<string, StringValues>())
             {
                 context.Request.Query[queryParameter.Key].Should().BeEquivalentTo(queryParameter.Value);
@@ -389,14 +441,15 @@ public class OutgoingTests
         await _server.StartAsync(_cancellationTokenSource.Token);
 
         // Initialize HttpConnectorFeature
-        _httpOutgoingConfig.Endpoints.Add($"{httpMethod}_Endpoint", new() { Path = path, HttpMethod = httpMethod, Topic = $"{httpMethod}_Topic" });
+        _httpOutgoingConfig.Endpoints.Add($"{httpMethod}_Endpoint",
+            new() { Path = path, HttpMethod = httpMethod, Topic = $"{httpMethod}_Topic" });
 
         _messenger = TestingMessenger.CreateScoped(_loggerFactory);
         _httpConnector.HttpConnectorOptions.Returns(new HttpConnectorOptions());
         _httpClientFactory.CreateClient(Arg.Any<string>()).Returns(_server.GetTestClient());
-        _httpClientFactory.CreateClient().Returns(_server.GetTestClient());
 
-        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration, _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
+        _httpConnectorFeature = new HttpConnectorFeature(_serviceProvider, _logger, _loggerFactory, _configuration,
+            _messenger, _httpClientFactory, _httpConnector, _metadata, _template);
 
         // Start HttpConnectorFeature
         await _httpConnectorFeature.StartAsync(_cancellationTokenSource.Token);
@@ -415,17 +468,14 @@ public class OutgoingTests
         response.Content.ToArray().Should().BeEquivalentTo(Encoding.UTF8.GetBytes(responseContent));
     }
 
-    [TestCleanup]
-    public async Task TestCleanup()
+    public async ValueTask DisposeAsync()
     {
-        if(_server is not null)
+        if (_server is not null)
         {
             await _server.StopAsync();
         }
-        if(_httpConnectorFeature is not null)
-        {
-            await _httpConnectorFeature.DisposeAsync();
-        }
+
+        await _httpConnectorFeature.DisposeAsync();
 
         await _cancellationTokenSource.CancelAsync();
     }

@@ -9,6 +9,7 @@ using eMessenger.Tests;
 using ePlugin.Engine;
 using ePlugin.Engine.Client;
 using ePlugin.Engine.Config;
+using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -16,16 +17,14 @@ using NSubstitute;
 
 namespace eHub.Tests.Connectors;
 
-[TestClass]
-public class PluginLoadTests
+public class PluginLoadTests : IAsyncLifetime
 {
-    public TestContext TestContext { get; set; } = default!;
-    private string CaseTestPath { get; set; } = default!;
+    private string CaseTestPath { get; set; } = null!;
     public ServiceProvider ServiceProvider { get; }
     private ILoggerFactory DebugLoggerFactory { get; set; }
-    private IPluginPublisher PluginPublisher { get; set; } = default!;
+    private IPluginPublisher PluginPublisher { get; set; } = null!;
     private IEffortlessConfigurationRegistry MockConfigRegistry { get; set; }
-    private PluginEngine PluginEngine { get; set; } = default!;
+    private PluginEngine PluginEngine { get; set; } = null!;
     private MessagingContext MessagingContext { get; set; } = new();
     private IMessenger Messenger { get; set; }
 
@@ -45,10 +44,10 @@ public class PluginLoadTests
             new DirectoryInfo(Path.Join(Environment.CurrentDirectory, "non_existent")));
     }
 
-    [TestInitialize()]
-    public void Startup()
+    public ValueTask InitializeAsync()
     {
-        var caseTestBasePath = Path.GetFullPath(Path.Join(TestContext.TestRunDirectory, Guid.NewGuid().ToString()));
+        var caseTestBasePath = Path.GetFullPath(
+            Path.Join(Path.GetTempPath(), "PluginLoadTests", Guid.NewGuid().ToString()));
         var dataPath = Path.Join(caseTestBasePath, "Plugins");
         CaseTestPath = Path.Join(caseTestBasePath, "In");
 
@@ -64,16 +63,19 @@ public class PluginLoadTests
                 DataPath = dataPath,
                 Modules = ConfigurationUtil.GetConfigurationFromObject(new
                 {
-                    Modules = new List<object>() {
-                    new {
-                        Module = "ImportFiles",
-                        Init = true,
-                        Scripts = CaseTestPath,
-                        Config = CaseTestPath,
-                        Watch = true },
-                    new { Module = "CompileScripts" },
-                    new { Module = "LoadAssemblies" },
-                }
+                    Modules = new List<object>()
+                    {
+                        new
+                        {
+                            Module = "ImportFiles",
+                            Init = true,
+                            Scripts = CaseTestPath,
+                            Config = CaseTestPath,
+                            Watch = true
+                        },
+                        new { Module = "CompileScripts" },
+                        new { Module = "LoadAssemblies" },
+                    }
                 }).GetSection("Modules")
             }
         };
@@ -81,34 +83,35 @@ public class PluginLoadTests
         mini.BuildPleng(NullConfiguration.Instance, DebugLoggerFactory);
         PluginPublisher = mini.GetRequiredService<IPluginPublisher>();
         PluginEngine = mini.GetRequiredService<PluginEngine>();
+
+        return ValueTask.CompletedTask;
     }
 
-    [TestMethod]
-    [Timeout(10_000)]
+    [Fact(Timeout = 10_000)]
     public async Task TestConnectorEventListener()
     {
-        // Setup
+        // Arrange
         var pluginPath = Path.GetFullPath(Path.Join(CaseTestPath, "File1.cs"));
-        File.WriteAllText(pluginPath, """
+        await File.WriteAllTextAsync(pluginPath, """
             using System;
             using System.Threading;
             using System.Threading.Tasks;
             using eHub.PlugIn;
             namespace PluginLoadTests;
             public class UnitTestConnector : IConnector {
-                public event UpdateStatusDelegate? UpdateStatus;
-                public async Task Run(CancellationToken ct) {
-                    UpdateStatus?.Invoke("test_key", "test_value");
-                    UpdateStatus?.Invoke("test_key2", "test_value2");
-                }
+             public event UpdateStatusDelegate? UpdateStatus;
+             public async Task Run(CancellationToken ct) {
+                 UpdateStatus?.Invoke("test_key", "test_value");
+                 UpdateStatus?.Invoke("test_key2", "test_value2");
+             }
             }
-            """);
+            """, TestContext.Current.CancellationToken);
+        
         await PluginEngine.RunMain();
 
         var eventRecorder = new RecordingConnectorListener();
         var eventAwaiter = new AwaitableConnectorListener();
 
-        // Act
         var connectionManager = new ConnectorManager(
             NullConfiguration.Instance,
             DebugLoggerFactory,
@@ -118,27 +121,30 @@ public class PluginLoadTests
             ServiceProvider,
             [eventRecorder, eventAwaiter],
             MockConfigRegistry,
-            null,
+            null!,
             Mocks.MeterFactory);
-        await connectionManager.StartAsync(default);
+        
+        // Act
+        await connectionManager.StartAsync(TestContext.Current.CancellationToken);
         var result = await connectionManager.StartConnectorByType("PluginLoadTests.UnitTestConnector");
-        Assert.IsTrue(result.IsOk);
+        
+        // Assert
+        result.IsOk.Should().BeTrue();
 
-        _ = await eventAwaiter.NextStatus();
+        _ = await eventAwaiter.NextStatusAsync();
 
         // Assert
-        CollectionAssert.AreEquivalent(
-            new KeyValuePair<string, string>[] { new("test_key", "test_value"), new("test_key2", "test_value2") },
-            eventRecorder.Statuses.Last().statusDictionary.ToArray());
+        eventRecorder.Statuses.Last().statusDictionary.ToArray().Should().BeEquivalentTo(
+            new KeyValuePair<string, string>[] { new("test_key", "test_value"), new("test_key2", "test_value2") });
     }
 
     // https://github.com/ewms/eHub/issues/4
-    [TestMethod]
-    [Timeout(10_000)]
+    [Fact(Timeout = 10_000)]
     public async Task TestChangeConnectorConfigShouldReload()
     {
+        // Arrange
         var pluginPath = Path.GetFullPath(Path.Join(CaseTestPath, "File1.cs"));
-        File.WriteAllText(pluginPath, """
+        await File.WriteAllTextAsync(pluginPath, """
             using System;
             using System.Threading;
             using System.Threading.Tasks;
@@ -147,51 +153,51 @@ public class PluginLoadTests
 
             namespace PluginLoadTests;
             public abstract class BaseUnitTestConnector : IConnector {
-                private readonly IOptionsMonitor<UnitConf> _options;
-                private readonly string _name;
-                private readonly IDisposable? confListener;
-                public event UpdateStatusDelegate? UpdateStatus;
+             private readonly IOptionsMonitor<UnitConf> _options;
+             private readonly string _name;
+             private readonly IDisposable? confListener;
+             public event UpdateStatusDelegate? UpdateStatus;
 
-                public BaseUnitTestConnector(IOptionsMonitor<UnitConf> options, string name) {
-                    _options = options;
-                    _name = name;
-                    confListener = options.OnChange(ConfigChanged);
-                }
+             public BaseUnitTestConnector(IOptionsMonitor<UnitConf> options, string name) {
+                 _options = options;
+                 _name = name;
+                 confListener = options.OnChange(ConfigChanged);
+             }
 
-                public async Task Run(CancellationToken ct) {
-                    ct.Register(() => { confListener?.Dispose(); });
-                    ConfigChanged(_options.CurrentValue);
-                }
+             public async Task Run(CancellationToken ct) {
+                 ct.Register(() => { confListener?.Dispose(); });
+                 ConfigChanged(_options.CurrentValue);
+             }
 
-                private void ConfigChanged(UnitConf confNew)
-                {
-                    UpdateStatus?.Invoke("status", "Loaded " + _name + " with " + confNew.Msg);
-                }
+             private void ConfigChanged(UnitConf confNew)
+             {
+                 UpdateStatus?.Invoke("status", "Loaded " + _name + " with " + confNew.Msg);
+             }
             }
 
             public class UnitTestConnectorA : BaseUnitTestConnector {
-                public UnitTestConnectorA(IOptionsMonitor<UnitConf> options) : base(options, "A") {}
+             public UnitTestConnectorA(IOptionsMonitor<UnitConf> options) : base(options, "A") {}
             }
 
             public class UnitTestConnectorB : BaseUnitTestConnector {
-                public UnitTestConnectorB(IOptionsMonitor<UnitConf> options) : base(options, "B") {}
+             public UnitTestConnectorB(IOptionsMonitor<UnitConf> options) : base(options, "B") {}
             }
 
             [ScriptOptions]
-            public class UnitConf {
-                public string Msg { get; set; }
+            public class UnitConf  {
+             public string Msg { get; set; }
             }
-            """);
+            """, TestContext.Current.CancellationToken);
         var connectorJsonPath = Path.GetFullPath(Path.Join(CaseTestPath, "connector.json"));
 
-        File.WriteAllText(connectorJsonPath, """
+        await File.WriteAllTextAsync(connectorJsonPath, """
             {
                 "Unit": {
                     "Type": "PluginLoadTests.UnitTestConnectorA",
                     "Config": { "Msg": "Default" }
                 }
             }
-            """);
+            """, TestContext.Current.CancellationToken);
 
         await PluginEngine.RunMain();
 
@@ -206,48 +212,50 @@ public class PluginLoadTests
             ServiceProvider,
             [events],
             MockConfigRegistry,
-            null,
+            null!,
             Mocks.MeterFactory);
 
-        await connectionManager.StartAsync(default);
+        // Act
+        await connectionManager.StartAsync(TestContext.Current.CancellationToken);
 
         // Assert before change
-        await events.NextConfigReload();
-        var (_, statusDictionary) = await events.NextStatus();
-        Assert.AreEqual("Loaded A with Default", statusDictionary["status"]);
-
+        await events.NextConfigReloadAsync();
+        var (_, statusDictionary) = await events.NextStatusAsync();
+        statusDictionary["status"].Should().Be("Loaded A with Default");
 
         events.ResetConfigReload();
         events.ResetStatus();
         // > Simulate config change
-        File.WriteAllText(connectorJsonPath, """
+        await File.WriteAllTextAsync(connectorJsonPath, """
             {
                 "Unit": {
                     "Type": "PluginLoadTests.UnitTestConnectorA",
                     "Config": { "Msg": "Changed" }
                 }
             }
-            """);
+            """, TestContext.Current.CancellationToken);
 
-        await events.NextConfigReload();
-        (_, statusDictionary) = await events.NextStatus();
-        Assert.AreEqual("Loaded A with Changed", statusDictionary["status"]);
+        await events.NextConfigReloadAsync();
+        (_, statusDictionary) = await events.NextStatusAsync();
+        statusDictionary["status"].Should().Be("Loaded A with Changed");
 
 
         events.ResetConfigReload();
         events.ResetStatus();
         // > Simulate config change
-        File.WriteAllText(connectorJsonPath, """
+        await File.WriteAllTextAsync(connectorJsonPath, """
             {
                 "Unit": {
                     "Type": "PluginLoadTests.UnitTestConnectorB",
                     "Config": { "Msg": "LoadB" }
                 }
             }
-            """);
+            """, TestContext.Current.CancellationToken);
 
-        await events.NextConfigReload();
-        (_, statusDictionary) = await events.NextStatus();
-        Assert.AreEqual("Loaded B with LoadB", statusDictionary["status"]);
+        await events.NextConfigReloadAsync();
+        (_, statusDictionary) = await events.NextStatusAsync();
+        statusDictionary["status"].Should().Be("Loaded B with LoadB");
     }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

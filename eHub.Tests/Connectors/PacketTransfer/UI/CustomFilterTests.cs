@@ -18,23 +18,21 @@ using eHub.Tests.Helper;
 
 namespace eHub.Tests.Connectors.PacketTransfer.UI;
 
-[TestClass]
-public class CustomFilterTests
+public class CustomFilterTests : IAsyncLifetime
 {
     private const string TestChannel = "TestChannel";
 
-    private PacketDtoService _packetDtoService = default!;
-    private ConnectorMetadata _metadata = default!;
-    private ConnectorTemplate _connectorTemplate = default!;
-    private ILoggerFactory _loggerFactory = default!;
-    private IPacketFilterConfigurator _packetTransfer = default!;
-    private IPacketConverter _packetConverter = default!;
-    private IDbContextFactory<HubDbContext> _dbContextFactory = default!;
-    private ILogger<PacketDtoService> _logger = default!;
-    private SqliteConnection _connection = default!;
+    private PacketDtoService _packetDtoService = null!;
+    private ConnectorMetadata _metadata = null!;
+    private ConnectorTemplate _connectorTemplate = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private IPacketFilterConfigurator _packetTransfer = null!;
+    private IPacketConverter _packetConverter = null!;
+    private IDbContextFactory<HubDbContext> _dbContextFactory = null!;
+    private ILogger<PacketDtoService> _logger = null!;
+    private SqliteConnection _connection = null!;
 
-    [TestInitialize]
-    public async Task TestInitialize()
+    public async ValueTask InitializeAsync()
     {
         _connection = new SqliteConnection(DbHelper.InMemoryConnectionString);
         await _connection.OpenAsync();
@@ -54,30 +52,37 @@ public class CustomFilterTests
         await context.Database.EnsureCreatedAsync();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetUICustomFilters_WithNoCustomFilters_ReturnsEmpty()
     {
-        _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder => { }));
+        // Arrange
+        _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(_ => { }));
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
-
+        
+        // Act
         var filters = _packetDtoService.GetUICustomFilters();
-
+        
+        // Assert
         filters.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetUICustomFilters_WithCustomFilters_ReturnsCustomFilters()
     {
+        // Arrange
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
             builder.AddCustomFilter<string>("MyStringFilter", "SUBSTRING(BinaryData, 1, 4)");
             builder.AddCustomFilter<int>("MyIntFilter", "CAST(SUBSTRING(BinaryData, 5, 3) AS INT)");
             builder.AddCustomFilter<DateTime>("MyDateTimeFilter", "CAST(SUBSTRING(BinaryData, 9, 10) AS DATETIME)");
         }));
-
+        
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
-        var filters = _packetDtoService.GetUICustomFilters();
 
+        // Act
+        var filters = _packetDtoService.GetUICustomFilters();
+        
+        // Assert
         filters.Should().HaveCount(3);
         filters.Should().ContainKey("MyStringFilter");
         filters.Should().ContainKey("MyIntFilter");
@@ -88,10 +93,11 @@ public class CustomFilterTests
         filters["MyDateTimeFilter"].Should().Be(typeof(DateTime).ToString());
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_NoCustomFilters_DoesNotAddFromSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var columnFilter = new ColumnFilterDto(nameof(Packet.Status), ColumnFilterOperator.Equal, PacketStatus.Enqueued.ToString());
         var filter = new PacketRequestDto
@@ -102,19 +108,22 @@ public class CustomFilterTests
         );
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
         var expression = (MethodCallExpression)query.Expression;
 
+        // Assert
         #pragma warning disable EF1001 // Internal EF Core API usage.
         expression.Arguments.Should().NotContainItemsAssignableTo<FromSqlQueryRootExpression>();
         #pragma warning restore EF1001 // Internal EF Core API usage.
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithBinaryDataFilter_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("SomeData"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("MyDataBinary"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -122,23 +131,26 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("Data"), Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var columnFilter = new ColumnFilterDto(nameof(Packet.BinaryData), ColumnFilterOperator.Contains, "Data");
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
-
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(3);
         packets.Should().OnlyContain(p => Encoding.UTF8.GetString(p.BinaryData).Contains("Data"));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterStringEqual_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK  END"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("START   NO  END"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -146,7 +158,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK  END"), Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -157,18 +169,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
-
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(2);
         packets.Should().OnlyContain(p => Encoding.UTF8.GetString(p.BinaryData).Substring(8, 2) == "OK");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterStringNotEqual_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK  END"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("START   NO  END"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -176,7 +191,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK  END"), Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -187,18 +202,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
-
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(2);
         packets.Should().OnlyContain(p => Encoding.UTF8.GetString(p.BinaryData).Substring(8, 2) != "OK");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterStartsWith_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK1 END"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("START   NO2 END"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -206,7 +224,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK4 END"), Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -217,18 +235,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(2);
-
         packets.Should().OnlyContain(p => Encoding.UTF8.GetString(p.BinaryData).Substring(8, 3).StartsWith("OK"));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterEndsWith_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("START   1OK END"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("START   NO2 END"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -236,7 +257,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK4 END"), Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -247,18 +268,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(2);
-
         packets.Should().OnlyContain(p => Encoding.UTF8.GetString(p.BinaryData).Substring(8, 3).EndsWith("OK"));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterContains_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK1 END"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("START   NO2 END"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -266,7 +290,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("START  OK4  END"), Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -277,18 +301,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(2);
-
         packets.Should().OnlyContain(p => Encoding.UTF8.GetString(p.BinaryData).Substring(8, 4).Contains("OK"));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterNotContains_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK1 END"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("START   NO2 END"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -296,7 +323,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("START  OK4  END"), Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -307,18 +334,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(2);
-
         packets.Should().OnlyContain(p => !Encoding.UTF8.GetString(p.BinaryData).Substring(8, 4).Contains("OK"));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterEmpty_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK1 END"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("START       END"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -326,7 +356,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("START123    END"), Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -337,18 +367,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(2);
-
         packets.Should().OnlyContain(p => string.IsNullOrWhiteSpace(Encoding.UTF8.GetString(p.BinaryData).Substring(8, 4)));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterNotEmpty_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("START   OK1 END"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("START       END"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -356,7 +389,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("START123    END"), Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -367,18 +400,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(2);
-
         packets.Should().OnlyContain(p => !string.IsNullOrWhiteSpace(Encoding.UTF8.GetString(p.BinaryData).Substring(8, 4)));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomNumericFilterEqual_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("0005"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("5"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -388,7 +424,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("Random"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -399,17 +435,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(3);
         packets.Should().OnlyContain(p => Convert.ToInt32(Encoding.UTF8.GetString(p.BinaryData)) == 5);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomNumericFilterNotEqual_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("0005"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("5"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -419,7 +459,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("Random"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -430,9 +470,12 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(3);
 
         foreach (var packet in packets)
@@ -444,10 +487,11 @@ public class CustomFilterTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterGreater_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("Data01"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("DataNr"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -457,7 +501,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("Data15"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -468,22 +512,26 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(3);
         packets.Should().OnlyContain(p => Convert.ToInt32(Encoding.UTF8.GetString(p.BinaryData).Substring(4, 2)) > 4);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterGreaterOrEqual_AppliesSqlQuery()
     {
+        // Arrange
         var dateTime = DateTime.Now;
-        var format = "yyyy-MM-dd HH:mm:ss";
+        const string format = "yyyy-MM-dd HH:mm:ss";
 
         dateTime = DateTime.Parse(dateTime.ToString(format));
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes(dateTime.ToString(format)), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes(dateTime.AddYears(-1).ToString(format)), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -494,7 +542,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes(dateTime.AddSeconds(1).ToString(format)), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -505,23 +553,26 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
-
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(3);
         packets.Should().OnlyContain(p => Convert.ToDateTime(Encoding.UTF8.GetString(p.BinaryData)) >= dateTime);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterLess_AppliesSqlQuery()
     {
+        // Arrange
         var dateTime = DateTime.Now;
-        var format = "yyyy-MM-dd HH:mm:ss";
+        const string format = "yyyy-MM-dd HH:mm:ss";
 
         dateTime = DateTime.Parse(dateTime.ToString(format));
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes(dateTime.ToString(format)), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes(dateTime.AddYears(-1).ToString(format)), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -532,7 +583,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes(dateTime.AddSeconds(1).ToString(format)), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -543,18 +594,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
-
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(2);
         packets.Should().OnlyContain(p => Convert.ToDateTime(Encoding.UTF8.GetString(p.BinaryData)) < dateTime);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithCustomFilterLessOrEqual_AppliesSqlQuery()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("Data01"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { BinaryData = Encoding.UTF8.GetBytes("Data02"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -564,7 +618,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("Data15"), Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now}
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -575,17 +629,21 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-
-        var packets = await query.AsNoTracking().ToArrayAsync();
+        var packets = await query.AsNoTracking().ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(3);
         packets.Should().OnlyContain(p => Convert.ToInt32(Encoding.UTF8.GetString(p.BinaryData).Substring(4, 2)) <= 3);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CreateFilteredQuery_WithValueBuilder_FiltersCorrectly()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         await context.Packet.AddRangeAsync([
             new() { BinaryData = Encoding.UTF8.GetBytes("<test>alpha"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now },
@@ -594,7 +652,7 @@ public class CustomFilterTests
             new() { BinaryData = Encoding.UTF8.GetBytes("beta"), Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now }
         ]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _packetTransfer.ConfigureCustomFilters(Arg.Do<ICustomFilterBuilder>(builder =>
         {
@@ -609,10 +667,15 @@ public class CustomFilterTests
         var filter = new PacketRequestDto(ColumnFilters: [columnFilter]);
 
         _packetDtoService = new PacketDtoService(_logger, _packetTransfer, _metadata, _connectorTemplate);
+        
+        // Act
         var query = _packetDtoService.CreateFilteredQuery(context, filter);
-        var packets = await query.AsNoTracking().ToListAsync();
-
+        var packets = await query.AsNoTracking().ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         packets.Should().HaveCount(1);
         packets.Single().BinaryData.Should().BeEquivalentTo(Encoding.UTF8.GetBytes("<test>alpha"));
     }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

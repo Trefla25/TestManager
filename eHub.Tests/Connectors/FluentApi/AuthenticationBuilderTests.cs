@@ -3,44 +3,52 @@ using FluentAssertions;
 
 namespace eHub.Tests.Connectors.FluentApi;
 
-[TestClass]
 public class AuthenticationBuilderTests
 {
     private readonly AuthenticationBuilder _builder = new();
 
-    [TestMethod]
+    [Fact]
     public void UseBasic_WhenCalled_AddsBasicAuthentication()
     {
+        // Arrange
         var configured = false;
-        _builder.AddBasic(b => configured = true);
-
+        _builder.AddBasic(_ => configured = true);
+        
+        // Act
         var authConfig = _builder.Build();
-
+        
+        // Assert
         authConfig.Basic.Should().NotBeNull();
         configured.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void UseJwtBearer_WithValidSettings_AddsJwtBearerAuthentication()
     {
+        // Arrange
         var configured = false;
-        _builder.AddJwtBearer(jwt => configured = true);
-
+        _builder.AddJwtBearer(_ => configured = true);
+        
+        // Act
         var authConfig = _builder.Build();
-
+        
+        // Assert
         authConfig.JWT.Should().NotBeNull();
         configured.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void Build_WhenAllMethodsChained_ConfiguresAllProperties()
     {
+        // Arrange
         _builder
-            .AddBasic(b => { })
-            .AddJwtBearer(jwt => { });
-
+            .AddBasic(_ => { })
+            .AddJwtBearer(_ => { });
+        
+        // Act
         var authConfig = _builder.Build();
-
+        
+        // Assert
         authConfig.Basic.Should().NotBeNull();
         authConfig.JWT.Should().NotBeNull();
     }

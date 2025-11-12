@@ -7,20 +7,21 @@ using System.Text.Json;
 
 namespace eHub.Tests.Connectors;
 
-[TestClass]
 public class ConnectorResponseTests
 {
     private const string ConnectorName = "MyConnector";
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
-    [TestMethod]
+    [Fact]
     public void ParameterlessConstructor_WhenPropertiesSet_SetsAllValues()
     {
+        // Arrange
         var content = new ReadOnlyMemory<byte>([7, 8, 9]);
-        var contentType = MediaTypeNames.Text.Plain;
+        const string contentType = MediaTypeNames.Text.Plain;
         var http = new ConnectorResponse.HttpConnectorResponse(200);
         var packetTransfer = new ConnectorResponse.PacketTransferResponse(ProcessPacketState.Success);
-
+        
+        // Act
         var response = new ConnectorResponse
         {
             Content = content,
@@ -29,7 +30,8 @@ public class ConnectorResponseTests
             Http = http,
             PacketTransfer = packetTransfer
         };
-
+        
+        // Assert
         response.Content.Should().BeEquivalentTo(content);
         response.ContentType.Should().Be(contentType);
         response.ConnectorName.Should().Be(ConnectorName);
@@ -37,14 +39,17 @@ public class ConnectorResponseTests
         response.PacketTransfer.Should().Be(packetTransfer);
     }
 
-    [TestMethod]
+    [Fact]
     public void Constructor_OnlyRequired_SetsValues()
     {
+        // Arrange
         var content = new ReadOnlyMemory<byte>([7, 8, 9]);
-        var contentType = MediaTypeNames.Text.Plain;
-
+        const string contentType = MediaTypeNames.Text.Plain;
+        
+        // Act
         var response = new ConnectorResponse(content, contentType, ConnectorName);
-
+        
+        // Assert
         response.Content.Should().BeEquivalentTo(content);
         response.ContentType.Should().Be(contentType);
         response.ConnectorName.Should().Be(ConnectorName);
@@ -52,16 +57,19 @@ public class ConnectorResponseTests
         response.PacketTransfer.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void Constructor_AllValues_SetsAllValues()
     {
+        // Arrange
         var content = new ReadOnlyMemory<byte>([7, 8, 9]);
-        var contentType = MediaTypeNames.Text.Plain;
+        const string contentType = MediaTypeNames.Text.Plain;
         var http = new ConnectorResponse.HttpConnectorResponse(200);
         var packetTransfer = new ConnectorResponse.PacketTransferResponse(ProcessPacketState.Success);
-
+        
+        // Act
         var response = new ConnectorResponse(content, contentType, ConnectorName, http, packetTransfer);
-
+        
+        // Assert
         response.Content.Should().BeEquivalentTo(content);
         response.ContentType.Should().Be(contentType);
         response.ConnectorName.Should().Be(ConnectorName);
@@ -69,95 +77,115 @@ public class ConnectorResponseTests
         response.PacketTransfer.Should().Be(packetTransfer);
     }
 
-    [TestMethod]
+    [Fact]
     public void ParameterlessHttpConstructor_WhenPropertiesSet_SetsAllValues()
     {
-        var statusCode = 200;
+        // Arrange
+        const int statusCode = 200;
         var headers = new Dictionary<string, StringValues>() { { "X-Custom-Header", "CustomValue" } };
-
+        
+        // Act
         var response = new ConnectorResponse.HttpConnectorResponse
         {
             StatusCode = statusCode,
             Headers = headers
         };
-
+        
+        // Assert
         response.StatusCode.Should().Be(statusCode);
         response.Headers.Should().BeEquivalentTo(headers);
     }
 
-    [TestMethod]
+    [Fact]
     public void HttpConstructor_OnlyRequired_SetsValues()
     {
-        var statusCode = 200;
-
+        // Arrange
+        const int statusCode = 200;
+        
+        // Act
         var response = new ConnectorResponse.HttpConnectorResponse(statusCode);
-
+        
+        // Assert
         response.StatusCode.Should().Be(statusCode);
         response.Headers.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void HttpConstructor_AllParameters_SetsAllValues()
     {
-        var statusCode = 200;
+        // Arrange
+        const int statusCode = 200;
         var headers = new Dictionary<string, StringValues>() { { "X-Custom-Header", "CustomValue" } };
-
+        
+        // Act
         var response = new ConnectorResponse.HttpConnectorResponse(statusCode, headers);
-
+        
+        // Assert
         response.StatusCode.Should().Be(statusCode);
         response.Headers.Should().BeEquivalentTo(headers);
     }
 
-    [DataTestMethod]
-    [DataRow(200)]
-    [DataRow(202)]
-    [DataRow(251)]
-    [DataRow(299)]
+    [Theory]
+    [InlineData(200)]
+    [InlineData(202)]
+    [InlineData(251)]
+    [InlineData(299)]
     public void HttpIsSuccessStatusCode_WithSuccessStatusCode_ReturnsTrue(int statusCode)
     {
+        // Act
         var response = new ConnectorResponse.HttpConnectorResponse(statusCode);
-
+        
+        // Assert
         response.IsSuccessStatusCode.Should().BeTrue();
     }
 
-    [DataTestMethod]
-    [DataRow(199)]
-    [DataRow(300)]
-    [DataRow(400)]
-    [DataRow(500)]
+    [Theory]
+    [InlineData(199)]
+    [InlineData(300)]
+    [InlineData(400)]
+    [InlineData(500)]
     public void HttpIsSuccessStatusCode_WithNonSuccessStatusCode_ReturnsFalse(int statusCode)
     {
+        // Act
         var response = new ConnectorResponse.HttpConnectorResponse(statusCode);
-
+        
+        // Assert
         response.IsSuccessStatusCode.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void ParameterlessPacketTransferConstructor_WhenPropertiesSet_SetsAllValues()
     {
-        var processPacketState = ProcessPacketState.Success;
-
+        // Arrange
+        const ProcessPacketState processPacketState = ProcessPacketState.Success;
+        
+        // Act
         var response = new ConnectorResponse.PacketTransferResponse
         {
             ProcessPacketState = processPacketState
         };
-
+        
+        // Assert
         response.ProcessPacketState.Should().Be(processPacketState);
     }
 
-    [TestMethod]
+    [Fact]
     public void PacketTransferConstructor_AllParameters_SetsAllValues()
     {
-        var processPacketState = ProcessPacketState.Success;
-
+        // Arrange
+        const ProcessPacketState processPacketState = ProcessPacketState.Success;
+        
+        // Act
         var response = new ConnectorResponse.PacketTransferResponse(processPacketState);
-
+        
+        // Assert
         response.ProcessPacketState.Should().Be(processPacketState);
     }
 
-    [TestMethod]
+    [Fact]
     public void JsonSerialize_FromConnectorResponse_SerializesResponse()
     {
+        // Arrange
         var request = new ConnectorResponse(
             content: new ReadOnlyMemory<byte>([7, 8, 9]),
             contentType: MediaTypeNames.Text.Plain,
@@ -168,7 +196,7 @@ public class ConnectorResponseTests
             packetTransfer: new ConnectorResponse.PacketTransferResponse(
                 processPacketState: ProcessPacketState.Success));
 
-        var expectedJson = """
+        const string expectedJson = """
         {
           "Content": "BwgJ",
           "ContentType": "text/plain",
@@ -189,17 +217,22 @@ public class ConnectorResponseTests
           }
         }
         """;
-
+        
+        // Act
         var json = JsonSerializer.Serialize(request, _jsonOptions);
-
+        
+        // Assert
         json.Should().NotBeNull();
-        json.Should().BeEquivalentTo(expectedJson);
+        var normalizedJson = json.Replace("\r\n", "\n");
+        var normalizedExpected = expectedJson.Replace("\r\n", "\n");
+        normalizedJson.Should().Be(normalizedExpected);
     }
 
-    [TestMethod]
+    [Fact]
     public void JsonDeserialize_FromJson_DeserializesResponse()
     {
-        var json = """
+        // Arrange
+        const string json = """
         {
           "Content": "BwgJ",
           "ContentType": "text/plain",
@@ -230,9 +263,11 @@ public class ConnectorResponseTests
                 headers: new Dictionary<string, StringValues>() { { "Empty", "" }, { "Single", "value" }, { "Multiple", new(["value1", "value2"]) } }),
             packetTransfer: new ConnectorResponse.PacketTransferResponse(
                 processPacketState: ProcessPacketState.Success));
-
+        
+        // Act
         var request = JsonSerializer.Deserialize<ConnectorResponse>(json);
-
+        
+        // Assert
         request.Should().NotBeNull();
         request.Content.ToArray().Should().BeEquivalentTo(expectedRequest.Content.ToArray());
         request.ContentType.Should().Be(expectedRequest.ContentType);

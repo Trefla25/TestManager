@@ -4,157 +4,197 @@ using FluentAssertions;
 
 namespace eHub.Tests.Connectors.FluentApi;
 
-[TestClass]
 public class OAuth2ConfigBuilderTests
 {
     private readonly OAuth2ConfigBuilder _builder = new();
 
-    [TestMethod]
+    [Fact]
     public void SetAccessTokenUrl_WithValidUrl_SetsAccessTokenUrl()
     {
-        _builder.SetAccessTokenUrl("http://oauth2.example.com");
-
+        // Arrange
+        _builder.SetAccessTokenUrl("https://oauth2.example.com");
+        
+        // Act
         var config = _builder.Build();
-
-        config.AccessTokenUrl.Should().Be("http://oauth2.example.com");
+        
+        // Assert
+        config.AccessTokenUrl.Should().Be("https://oauth2.example.com");
     }
 
-    [TestMethod]
+    [Fact]
     public void SetClientId_WithValidClientId_SetsClientId()
     {
+        // Arrange
         _builder.SetClientId("client123");
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.ClientId.Should().Be("client123");
     }
 
-    [TestMethod]
+    [Fact]
     public void SetClientSecret_WithValidSecret_SetsClientSecret()
     {
+        // Arrange
         _builder.SetClientSecret("secret");
-
+        
+        // Act
         var config = _builder.Build();
+        
+        // Assert
         config.ClientSecret.Should().Be("secret");
 
     }
 
-    [TestMethod]
+    [Fact]
     public void SetPassword_WithValidPassword_SetsPassword()
     {
-        _builder.SetPassword("mypassword");
-
+        // Arrange
+        _builder.SetPassword("myPassword");
+        
+        // Act
         var config = _builder.Build();
-
-        config.Password.Should().Be("mypassword");
+        
+        // Assert
+        config.Password.Should().Be("myPassword");
     }
 
-    [TestMethod]
+    [Fact]
     public void SetScope_WithValidScope_SetsScope()
     {
+        // Arrange
         _builder.SetScope("read");
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Scope.Should().Be("read");
     }
 
-    [TestMethod]
+    [Fact]
     public void SetUsername_WithValidUsername_SetsUsername()
     {
+        // Arrange
         _builder.SetUsername("user");
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Username.Should().Be("user");
     }
 
-    [TestMethod]
+    [Fact]
     public void SetCode_WithValidCode_SetsCode()
     {
+        // Arrange
         _builder.SetCode("code123");
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Code.Should().Be("code123");
     }
 
-    [TestMethod]
+    [Fact]
     public void SetRedirectUri_WithValidUri_SetsRedirectUri()
     {
-        _builder.SetRedirectUri("http://redirect.example.com");
-
+        // Arrange
+        _builder.SetRedirectUri("https://redirect.example.com");
+        
+        // Act
         var config = _builder.Build();
-
-        config.RedirectUri.Should().Be("http://redirect.example.com");
+        
+        // Assert
+        config.RedirectUri.Should().Be("https://redirect.example.com");
     }
 
-    [TestMethod]
+    [Fact]
     public void UseAuthorizationCode_WhenCalled_SetsGrantTypeToAuthorizationCode()
     {
+        // Arrange
         _builder.UseAuthorizationCode();
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.GrantType.Should().Be(GrantTypes.AuthorizationCode);
     }
 
-    [TestMethod]
+    [Fact]
     public void UseClientCredentials_WhenCalled_SetsGrantTypeToClientCredentials()
     {
+        // Arrange
         _builder.UseClientCredentials();
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.GrantType.Should().Be(GrantTypes.ClientCredentials);
     }
 
-    [TestMethod]
+    [Fact]
     public void UsePassword_WhenCalled_SetsGrantTypeToPassword()
     {
+        // Arrange
         _builder.UsePassword();
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.GrantType.Should().Be(GrantTypes.Password);
     }
 
-    [TestMethod]
-    public void Build_WithMulipleGrantTypes_KeepsLastType()
+    [Fact]
+    public void Build_WithMultipleGrantTypes_KeepsLastType()
     {
+        // Arrange
         _builder
             .UsePassword()
             .UseClientCredentials()
             .UseAuthorizationCode();
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.GrantType.Should().Be(GrantTypes.AuthorizationCode);
     }
 
-    [TestMethod]
+    [Fact]
     public void Build_WhenAllMethodsChained_ConfiguresAllProperties()
     {
+        // Arrange
         _builder
-            .SetAccessTokenUrl("http://oauth2.example.com")
+            .SetAccessTokenUrl("https://oauth2.example.com")
             .SetClientId("client123")
             .SetClientSecret("secret")
-            .SetPassword("mypassword")
+            .SetPassword("myPassword")
             .SetScope("read")
             .SetUsername("user")
             .SetCode("code123")
-            .SetRedirectUri("http://redirect.example.com")
+            .SetRedirectUri("https://redirect.example.com")
             .UseClientCredentials();
-
+        
+        // Act
         var config = _builder.Build();
-        config.AccessTokenUrl.Should().Be("http://oauth2.example.com");
+        
+        // Assert
+        config.AccessTokenUrl.Should().Be("https://oauth2.example.com");
         config.ClientId.Should().Be("client123");
         config.ClientSecret.Should().Be("secret");
-        config.Password.Should().Be("mypassword");
+        config.Password.Should().Be("myPassword");
         config.Scope.Should().Be("read");
         config.Username.Should().Be("user");
         config.Code.Should().Be("code123");
-        config.RedirectUri.Should().Be("http://redirect.example.com");
+        config.RedirectUri.Should().Be("https://redirect.example.com");
         config.GrantType.Should().Be(GrantTypes.ClientCredentials);
     }
 }

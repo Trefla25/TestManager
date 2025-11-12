@@ -16,6 +16,7 @@
         <IsTestProject>true</IsTestProject>
     </PropertyGroup>
     <ItemGroup Condition="$(ProjectName.EndsWith('.Tests')) Or $(ProjectName.EndsWith('.Documentation'))">
+        <!-- Testing Frameworks -->
         <PackageReference Include="coverlet.collector">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -24,15 +25,29 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" />
-        <PackageReference Include="JunitXml.TestLogger" />
-        <PackageReference Include="FluentAssertions" />
-        <PackageReference Include="MSTest.TestAdapter" />
-        <PackageReference Include="MSTest.TestFramework" />
-        <PackageReference Include="MSTest.Analyzers">
+        <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+        <PackageReference Include="JunitXml.TestLogger"/>
+
+        <!-- Mocking -->
+        <PackageReference Include="NSubstitute"/>
+        <PackageReference Include="NSubstitute.Analyzers.CSharp">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+
+        <!-- Testing -->
+        <PackageReference Include="xunit.v3"/>
+        <PackageReference Include="xunit.runner.visualstudio">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+
+        <!-- Testing Helpers  -->
+        <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+        <PackageReference Include="Meziantou.Extensions.Logging.Xunit.v3"/>
+        <PackageReference Include="FluentAssertions"/>
+
+        <Using Include="Xunit"/>
     </ItemGroup>
 
     <ItemGroup>

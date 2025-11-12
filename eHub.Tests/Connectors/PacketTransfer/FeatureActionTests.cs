@@ -27,28 +27,26 @@ using eHub.Tests.Helper;
 
 namespace eHub.Tests.Connectors.PacketTransfer;
 
-[TestClass]
-public class FeatureActionTests
+public class FeatureActionTests : IAsyncLifetime
 {
-    private PacketTransferFeature _packetTransferFeature = default!;
-    private SqliteConnection _connection = default!;
-    private ConnectorMetadata _metadata = default!;
-    private ConnectorTemplate _connectorTemplate = default!;
-    private PacketDtoService _packetDtoService = default!;
-    private PluginData _pluginData = default!;
-    private CancellationTokenSource _cancellationTokenSource = default!;
-    private IDbContextFactory<HubDbContext> _dbContextFactory = default!;
-    private ILoggerFactory _loggerFactory = default!;
-    private ILogger<PacketTransferFeature> _logger = default!;
-    private IScopedMessenger _messenger = default!;
-    private IPacketFilterConfigurator _packetTransfer = default!;
-    private IPacketConverter _packetConverter = default!;
-    private IFilterRunnerProvider _filterRunnerProvider = default!;
-    private IEffortlessConfigurationRegistry _registry = default!;
-    private ConnectorMetrics _metrics = default!;
+    private PacketTransferFeature _packetTransferFeature = null!;
+    private SqliteConnection _connection = null!;
+    private ConnectorMetadata _metadata = null!;
+    private ConnectorTemplate _connectorTemplate = null!;
+    private PacketDtoService _packetDtoService = null!;
+    private PluginData _pluginData = null!;
+    private CancellationTokenSource _cancellationTokenSource = null!;
+    private IDbContextFactory<HubDbContext> _dbContextFactory = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private ILogger<PacketTransferFeature> _logger = null!;
+    private IScopedMessenger _messenger = null!;
+    private IPacketFilterConfigurator _packetTransfer = null!;
+    private IPacketConverter _packetConverter = null!;
+    private IFilterRunnerProvider _filterRunnerProvider = null!;
+    private IEffortlessConfigurationRegistry _registry = null!;
+    private ConnectorMetrics _metrics = null!;
 
-    [TestInitialize]
-    public async Task Initialize()
+    public async ValueTask InitializeAsync()
     {
         _cancellationTokenSource = new();
         _connection = new SqliteConnection(DbHelper.InMemoryConnectionString);
@@ -93,67 +91,79 @@ public class FeatureActionTests
         await _packetTransferFeature.StartAsync(_cancellationTokenSource.Token);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task PollAliveConnectors_WhenCalled_ReturnsKeepAliveDto()
     {
+        // Arrange
         _packetTransferFeature = new PacketTransferFeature(_logger, _dbContextFactory, _messenger, _packetTransfer, _filterRunnerProvider, _registry, _packetDtoService, _metadata, _connectorTemplate, _pluginData, _metrics);
         await _packetTransferFeature.StartAsync(_cancellationTokenSource.Token);
-
+        
+        // Act
         var response = await _messenger
             .AskAsync<ConnectorKeepAliveDto>(ConnectorContract.PollAliveConnectorsTopic())
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         response.Should().NotBeNull();
         response.Identifier.Should().Be(_metadata.ConnectorIdentifier);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task UIGet_WhenCalled_ReturnsConnectorUIData()
     {
+        // Act
         var response = await _messenger
             .AskAsync<ConnectorUiData>(ConnectorContract.UIGetTopic(_metadata.ConnectorIdentifier))
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         response.Should().NotBeNull();
         response.ConnectorName.Should().Be(_metadata.TemplateName);
         response.ConnectorType.Should().Be(_metadata.ConnectorType);
         response.UIViewConfig.Should().NotBeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetCustomFilters_WhenCalled_ReturnsCustomFilters()
     {
+        // Act
         var response = await _messenger
             .AskAsync<IReadOnlyDictionary<string, string>>(ConnectorContract.GetCustomFiltersTopic(_metadata.ConnectorIdentifier))
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         response.Should().NotBeNull();
         response.Should().ContainKey("MyCustomFilter");
         response["MyCustomFilter"].Should().Be(typeof(string).ToString());
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetPackets_WhenDatabaseIsEmpty_ReturnsEmpty()
     {
+        // Arrange
         var filter = new PacketRequestDto(
             DateTimeStart: DateTime.MinValue,
             DateTimeEnd: DateTime.MaxValue);
 
         var packetsGetTopic = ConnectorContract.UIPacketsGetTopic(_metadata.ConnectorIdentifier);
+
+        // Act
         var packetWrapper = await _messenger
             .AskAsync<PacketRequestDto, PacketWrapperDto>(packetsGetTopic, filter)
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         packetWrapper.Should().NotBeNull();
         packetWrapper.Packets.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetPackets_WithValidDateRange_ReturnsPackets()
     {
+        // Arrange
         var dateTimeNow = DateTime.Now;
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, dateTimeNow.AddHours(-2), dateTimeNow);
 
         _packetConverter.PacketToUIDataConverter(Arg.Any<PacketData>(), Arg.Any<CancellationToken>()).Returns(x =>
@@ -169,25 +179,29 @@ public class FeatureActionTests
 
         var filteredPackets = await context.Packet.AsNoTracking()
             .Where(p => p.DateCreated >= filter.DateTimeStart && p.DateCreated <= filter.DateTimeEnd)
-            .ToArrayAsync();
+            .ToArrayAsync(_cancellationTokenSource.Token);
 
         var expectedPackets = await Task.WhenAll(filteredPackets.Select(async p => await _packetDtoService.BuildDtoAsync(p)));
 
         var packetsGetTopic = ConnectorContract.UIPacketsGetTopic(_metadata.ConnectorIdentifier);
+        
+        // Act
         var packetWrapper = await _messenger
             .AskAsync<PacketRequestDto, PacketWrapperDto>(packetsGetTopic, filter)
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         packetWrapper.Should().NotBeNull();
         packetWrapper.Packets.Should().BeEquivalentTo(expectedPackets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetPackets_WithColumnFilters_ReturnsPackets()
     {
+        // Arrange
         var dateTimeNow = DateTime.Now;
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(20, dateTimeNow.AddHours(-2), dateTimeNow.AddHours(-1), ["TestChannel1", "TestChannel2"]);
         await context.Packet.AddAsync(new Packet
         {
@@ -195,30 +209,21 @@ public class FeatureActionTests
             Channel = "TestChannel1",
             DateCreated = dateTimeNow,
             Status = PacketStatus.Enqueued
-        });
+        }, _cancellationTokenSource.Token);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(_cancellationTokenSource.Token);
 
         _packetConverter.PacketToUIDataConverter(Arg.Any<PacketData>(), Arg.Any<CancellationToken>()).Returns(x =>
         {
             var packet = x.ArgAt<PacketData>(0);
             var data = Encoding.UTF8.GetString(packet.BinaryData.Span).Remove(0, 6);
 
-            if (packet.Id < 5)
+            return packet.Id switch
             {
-                // Matching filtering data but not preview
-                return new UIConversionInfo(data, $"Preview{data}", UIDataTypes.Plaintext);
-            }
-            else if(packet.Id < 10)
-            {
-                // Matching filtering preview but not data
-                return new UIConversionInfo("InvalidData", $"{data}Preview", UIDataTypes.Plaintext);
-            }
-            else
-            {
-                // Matching both data and preview
-                return new UIConversionInfo(data, $"{data}Preview", UIDataTypes.Plaintext);
-            }
+                < 5 => new UIConversionInfo(data, $"Preview{data}", UIDataTypes.Plaintext),
+                < 10 => new UIConversionInfo("InvalidData", $"{data}Preview", UIDataTypes.Plaintext),
+                _ => new UIConversionInfo(data, $"{data}Preview", UIDataTypes.Plaintext)
+            };
         });
 
         var columnFilters = new ColumnFilterDto[]
@@ -226,14 +231,14 @@ public class FeatureActionTests
             new(nameof(PacketDto.Data), ColumnFilterOperator.StartsWith, "Data"),
             new(nameof(PacketDto.PreviewData), ColumnFilterOperator.EndsWith, "Preview"),
             new(nameof(PacketDto.Channel), ColumnFilterOperator.Contains, "Channel1"),
-            new(nameof(PacketDto.Status), ColumnFilterOperator.Equal, PacketStatus.Enqueued.ToString())
+            new(nameof(PacketDto.Status), ColumnFilterOperator.Equal, nameof(PacketStatus.Enqueued))
         };
 
         var filter = new PacketRequestDto(ColumnFilters: [.. columnFilters]);
 
         var filteredPackets = await context.Packet.AsNoTracking()
             .Where(p => p.Channel.Contains("Channel1") && p.Status == PacketStatus.Enqueued)
-            .ToArrayAsync();
+            .ToArrayAsync(_cancellationTokenSource.Token);
 
         var packetsDto = await Task.WhenAll(filteredPackets.Select(async p => await _packetDtoService.BuildDtoAsync(p)));
         var expectedPackets = packetsDto
@@ -242,19 +247,23 @@ public class FeatureActionTests
             .ToArray();
 
         var packetsGetTopic = ConnectorContract.UIPacketsGetTopic(_metadata.ConnectorIdentifier);
+        
+        // Act
         var packetWrapper = await _messenger
             .AskAsync<PacketRequestDto, PacketWrapperDto>(packetsGetTopic, filter)
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         packetWrapper.Should().NotBeNull();
         packetWrapper.Packets.Should().BeEquivalentTo(expectedPackets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetPackets_WhenNoMatch_ReturnsEmpty()
     {
+        // Arrange
         var dateTimeNow = DateTime.Now;
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, dateTimeNow.AddHours(-3), dateTimeNow.AddHours(-2));
 
         var filter = new PacketRequestDto(
@@ -262,19 +271,23 @@ public class FeatureActionTests
             DateTimeEnd: dateTimeNow);
 
         var packetsGetTopic = ConnectorContract.UIPacketsGetTopic(_metadata.ConnectorIdentifier);
+        
+        // Act
         var packetWrapper = await _messenger
             .AskAsync<PacketRequestDto, PacketWrapperDto>(packetsGetTopic, filter)
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         packetWrapper.Should().NotBeNull();
         packetWrapper.Packets.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetPackets_WithInvalidDateRange_ReturnsEmpty()
     {
+        // Arrange
         var dateTimeNow = DateTime.Now;
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, dateTimeNow.AddHours(-3), dateTimeNow.AddHours(-2));
 
         var filter = new PacketRequestDto(
@@ -282,30 +295,38 @@ public class FeatureActionTests
             DateTimeEnd: dateTimeNow.AddHours(-1));
 
         var packetsGetTopic = ConnectorContract.UIPacketsGetTopic(_metadata.ConnectorIdentifier);
+        
+        // Act
         var packetWrapper = await _messenger
             .AskAsync<PacketRequestDto, PacketWrapperDto>(packetsGetTopic, filter)
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         packetWrapper.Should().NotBeNull();
         packetWrapper.Packets.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Resend_WhenDbEmpty_DoesntResend()
     {
+        // Arrange
         var nonExistent = ImmutableArray.Create(new PacketResendDto(42));
 
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketResendTopic(_metadata.ConnectorIdentifier), nonExistent);
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
-        var packets = await context.Packet.ToArrayAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
+        var packets = await context.Packet.ToArrayAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         packets.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Resend_WithSameData_InsertsIdenticalPacket()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
 
         await context.Packet.AddAsync(new Packet
         {
@@ -318,18 +339,21 @@ public class FeatureActionTests
             RetryCount = 1,
             Metadata = "Metadata",
             DynamicField = "DynamicField"
-        });
+        }, _cancellationTokenSource.Token);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(_cancellationTokenSource.Token);
 
         var request = ImmutableArray.Create(new PacketResendDto(1));
         var requestDateTime = DateTime.Now;
+        
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketResendTopic(_metadata.ConnectorIdentifier), request);
 
-        var packets = await context.Packet.AsNoTracking().ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().ToArrayAsync(_cancellationTokenSource.Token);
         var oldPacket = packets.Single(p => p.Id == 1);
         var newPacket = packets.Single(p => p.Id == 2);
-
+        
+        // Assert
         packets.Should().HaveCount(2);
 
         newPacket.BinaryData.Should().BeEquivalentTo(oldPacket.BinaryData);
@@ -343,10 +367,11 @@ public class FeatureActionTests
         newPacket.DynamicField.Should().Be(oldPacket.DynamicField);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Resend_WithNewData_InsertsPacketWithNewData()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
 
         await context.Packet.AddAsync(new Packet
         {
@@ -359,9 +384,9 @@ public class FeatureActionTests
             RetryCount = 1,
             Metadata = "Metadata",
             DynamicField = "DynamicField"
-        });
+        }, _cancellationTokenSource.Token);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(_cancellationTokenSource.Token);
 
         var uiConversion = new UIConversionInfo("OldData", "DataPreview", UIDataTypes.Plaintext);
         _packetConverter.PacketToUIDataConverter(Arg.Any<PacketData>(), Arg.Any<CancellationToken>())
@@ -373,12 +398,15 @@ public class FeatureActionTests
 
         var request = ImmutableArray.Create(new PacketResendDto(1, "NewData"));
         var requestDateTime = DateTime.Now;
+        
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketResendTopic(_metadata.ConnectorIdentifier), request);
 
-        var packets = await context.Packet.AsNoTracking().ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().ToArrayAsync(_cancellationTokenSource.Token);
         var oldPacket = packets.Single(p => p.Id == 1);
         var newPacket = packets.Single(p => p.Id == 2);
-
+        
+        // Assert
         packets.Should().HaveCount(2);
 
         newPacket.BinaryData.Should().BeEquivalentTo(Encoding.UTF8.GetBytes("NewBinaryData"));
@@ -392,10 +420,11 @@ public class FeatureActionTests
         newPacket.DynamicField.Should().Be(oldPacket.DynamicField);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Resend_WithMultiplePackets_InsertsPackets()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, DateTime.Now.AddHours(-2), DateTime.Now.AddHours(-1));
 
         var request = ImmutableArray.Create(
@@ -413,11 +442,14 @@ public class FeatureActionTests
             .Returns(Encoding.UTF8.GetBytes("NewBinaryData5"));
 
         var requestDateTime = DateTime.Now;
+        
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketResendTopic(_metadata.ConnectorIdentifier), request);
 
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
         var newPackets = packets.Where(p => p.Id > 10).ToArray();
-
+        
+        // Assert
         newPackets.Should().HaveCount(3);
         newPackets.Should().OnlyContain(p => p.Status == PacketStatus.Enqueued);
         newPackets.ForEach(p => p.DateCreated.Should().BeCloseTo(requestDateTime, TimeSpan.FromSeconds(1)));
@@ -427,10 +459,11 @@ public class FeatureActionTests
         newPackets[2].BinaryData.Should().BeEquivalentTo(packets[7].BinaryData);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Resend_WithNonExistentPacket_DoesNotInsertPacket()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, DateTime.Now.AddHours(-2), DateTime.Now.AddHours(-1));
 
         var request = ImmutableArray.Create(
@@ -439,11 +472,13 @@ public class FeatureActionTests
             new PacketResendDto(100)
         );
 
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketResendTopic(_metadata.ConnectorIdentifier), request);
 
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
         var newPackets = packets.Where(p => p.Id > 10).ToArray();
-
+        
+        // Assert
         newPackets.Should().HaveCount(2);
         newPackets.Should().OnlyContain(p => p.Status == PacketStatus.Enqueued);
 
@@ -451,10 +486,11 @@ public class FeatureActionTests
         newPackets[1].BinaryData.Should().BeEquivalentTo(packets[4].BinaryData);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Resend_WithNonResendablePackets_InsertsOnlyResendable()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.Packet.AddRangeAsync([
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.Enqueued },
             new Packet { Channel = "NoResendChannel", DateCreated = DateTime.Now, Status = PacketStatus.Processed },
@@ -463,7 +499,7 @@ public class FeatureActionTests
             new Packet { Channel = "BadChannel", DateCreated = DateTime.Now, Status = PacketStatus.InProgress },
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.ManualStop }]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(_cancellationTokenSource.Token);
 
         var request = ImmutableArray.Create(
             new PacketResendDto(1),
@@ -472,11 +508,13 @@ public class FeatureActionTests
             new PacketResendDto(4),
             new PacketResendDto(5));
 
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketResendTopic(_metadata.ConnectorIdentifier), request);
 
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
         var newPackets = packets.Where(p => p.Id > 6).ToArray();
-
+        
+        // Assert
         newPackets.Should().HaveCount(2);
         newPackets.Should().OnlyContain(p => p.Status == PacketStatus.Enqueued);
 
@@ -484,54 +522,64 @@ public class FeatureActionTests
         newPackets[1].BinaryData.Should().BeEquivalentTo(packets[3].BinaryData);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Delete_WithSinglePacket_DeletesPacket()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, DateTime.Now.AddHours(-1), DateTime.Now);
 
         var request = ImmutableArray.Create<long>(5);
 
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketDeleteSequenceTopic(_metadata.ConnectorIdentifier), request);
-
-        var packets = await context.Packet.AsNoTracking().ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().ToArrayAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         packets.Should().HaveCount(9);
         packets.Should().OnlyContain(p => p.Id != 5);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Delete_WithNonExistentPacket_DoesNothing()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, DateTime.Now.AddHours(-1), DateTime.Now);
 
         var request = ImmutableArray.Create<long>(100);
 
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketDeleteSequenceTopic(_metadata.ConnectorIdentifier), request);
-
-        var packets = await context.Packet.AsNoTracking().ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().ToArrayAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         packets.Should().HaveCount(10);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Delete_WithMultiplePackets_DeletesAllPackets()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, DateTime.Now.AddHours(-1), DateTime.Now);
 
         var request = ImmutableArray.Create<long>(2, 5, 9);
 
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketDeleteSequenceTopic(_metadata.ConnectorIdentifier), request);
-
-        var packets = await context.Packet.AsNoTracking().ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().ToArrayAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         packets.Should().HaveCount(7);
         packets.Should().OnlyContain(p => p.Id != 2 && p.Id != 5 && p.Id != 9);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ManualStop_WithSinglePacket_UpdatesPacket()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.Packet.AddRangeAsync([
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.Enqueued },
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.Processed },
@@ -540,39 +588,43 @@ public class FeatureActionTests
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.InProgress },
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.ManualStop }]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(_cancellationTokenSource.Token);
 
         var request = ImmutableArray.Create<long>(3);
 
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketManualStopSequenceTopic(_metadata.ConnectorIdentifier), request);
-
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
-
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         packets.Should().HaveCount(6);
         packets[2].Status.Should().Be(PacketStatus.ManualStop);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ManualStop_WithNonExistentPacket_DoesNothing()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, DateTime.Now.AddHours(-1), DateTime.Now);
 
         var request = ImmutableArray.Create<long>(100);
 
-        var oldPackets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
+        var oldPackets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
 
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketManualStopSequenceTopic(_metadata.ConnectorIdentifier), request);
-
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
-
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         packets.Should().BeEquivalentTo(oldPackets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ManualStop_WithAnyStatus_UpdatesAll()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.Packet.AddRangeAsync([
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.Enqueued },
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.Processed },
@@ -582,41 +634,48 @@ public class FeatureActionTests
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.ManualStop },
             new Packet { Channel = "TestChannel", DateCreated = DateTime.Now, Status = PacketStatus.Enqueued }]);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(_cancellationTokenSource.Token);
 
         var request = ImmutableArray.Create<long>(1, 2, 3, 4, 5, 6);
 
+        // Act
         await _messenger.SendAsync(ConnectorContract.PacketManualStopSequenceTopic(_metadata.ConnectorIdentifier), request);
-
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         packets.Should().HaveCount(7);
 
         packets.SkipLast(1).ForEach(p => p.Status.Should().Be(PacketStatus.ManualStop));
         packets[^1].Status.Should().Be(PacketStatus.Enqueued);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Export_WhenDatabaseIsEmpty_ReturnsEmpty()
     {
+        // Arrange
         var filter = new PacketRequestDto(
             DateTimeStart: DateTime.MinValue,
             DateTimeEnd: DateTime.MaxValue);
 
         var exportTopic = ConnectorContract.PacketExportTopic(_metadata.ConnectorIdentifier);
+        
+        // Act
         var exportResult = await _messenger
             .AskAsync<PacketRequestDto, ConnectorPacketsExportDto>(exportTopic, filter)
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         exportResult.Should().NotBeNull();
         exportResult.Packets.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Export_WithValidDateRange_ReturnsPackets()
     {
+        // Arrange
         var dateTimeNow = DateTime.Now;
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, dateTimeNow.AddHours(-2), dateTimeNow);
 
         _packetConverter.PacketToUIDataConverter(Arg.Any<PacketData>(), Arg.Any<CancellationToken>()).Returns(x =>
@@ -632,24 +691,28 @@ public class FeatureActionTests
 
         var filteredPackets = await context.Packet.AsNoTracking()
             .Where(p => p.DateCreated >= filter.DateTimeStart && p.DateCreated <= filter.DateTimeEnd)
-            .ToArrayAsync();
+            .ToArrayAsync(_cancellationTokenSource.Token);
 
         var expectedPackets = await Task.WhenAll(filteredPackets.Select(async p => await _packetDtoService.BuildDtoAsync(p)));
 
         var exportTopic = ConnectorContract.PacketExportTopic(_metadata.ConnectorIdentifier);
+        
+        // Act
         var exportResult = await _messenger
             .AskAsync<PacketRequestDto, ConnectorPacketsExportDto>(exportTopic, filter)
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         exportResult.Should().NotBeNull();
         exportResult.Packets.Should().BeEquivalentTo(expectedPackets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Export_WhenNoMatch_ReturnsEmpty()
     {
+        // Arrange
         var dateTimeNow = DateTime.Now;
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, dateTimeNow.AddHours(-3), dateTimeNow.AddHours(-2));
 
         var filter = new PacketRequestDto(
@@ -657,19 +720,23 @@ public class FeatureActionTests
             DateTimeEnd: dateTimeNow);
 
         var exportTopic = ConnectorContract.PacketExportTopic(_metadata.ConnectorIdentifier);
+        
+        // Act
         var exportResult = await _messenger
             .AskAsync<PacketRequestDto, ConnectorPacketsExportDto>(exportTopic, filter)
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         exportResult.Should().NotBeNull();
         exportResult.Packets.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Export_WithInvalidDateRange_ReturnsEmpty()
     {
+        // Arrange
         var dateTimeNow = DateTime.Now;
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, dateTimeNow.AddHours(-3), dateTimeNow.AddHours(-2));
 
         var filter = new PacketRequestDto(
@@ -677,18 +744,22 @@ public class FeatureActionTests
             DateTimeEnd: dateTimeNow.AddHours(-1));
 
         var exportTopic = ConnectorContract.PacketExportTopic(_metadata.ConnectorIdentifier);
+        
+        // Act
         var exportResult = await _messenger
             .AskAsync<PacketRequestDto, ConnectorPacketsExportDto>(exportTopic, filter)
             .FirstOrDefaultResponse();
-
+        
+        // Assert
         exportResult.Should().NotBeNull();
         exportResult.Packets.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Import_WhenNoConflict_ImportsPackets()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, DateTime.Now.AddHours(-2), DateTime.Now.AddHours(-1));
 
         var packetDtos = new PacketDto[]
@@ -731,17 +802,20 @@ public class FeatureActionTests
 
         var exportDto = new ConnectorPacketsExportDto([.. packetDtos]);
         var importDto = new ConnectorPacketsTryImportDto(exportDto, false);
+        
+        // Act
         var result = await _messenger
             .AskAsync<ConnectorPacketsTryImportDto, bool>(ConnectorContract.PacketTryImportTopic(_metadata.ConnectorIdentifier), importDto)
             .FirstOrDefaultResponse();
 
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
         var importedPackets = packets.Where(p => p.Id > 10).ToArray();
-
+        
+        // Assert
         result.Should().BeTrue();
         importedPackets.Should().HaveCount(3);
 
-        for (int i = 0; i < 3; i++)
+        for (var i = 0; i < 3; i++)
         {
             importedPackets[i].BinaryData.Should().BeEquivalentTo(Encoding.UTF8.GetBytes($"Binary{packetDtos[i].Data}"));
             importedPackets[i].DateCreated.Should().Be(packetDtos[i].DateCreated);
@@ -755,10 +829,11 @@ public class FeatureActionTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Import_WhenConflictWithoutForceImport_DoesNotImport()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, DateTime.Now.AddHours(-1), DateTime.Now.AddMinutes(-10));
 
         var packetDtos = new PacketDto[]
@@ -794,20 +869,23 @@ public class FeatureActionTests
 
         var exportDto = new ConnectorPacketsExportDto([.. packetDtos]);
         var importDto = new ConnectorPacketsTryImportDto(exportDto, false);
+        
+        // Act
         var result = await _messenger
             .AskAsync<ConnectorPacketsTryImportDto, bool>(ConnectorContract.PacketTryImportTopic(_metadata.ConnectorIdentifier), importDto)
             .FirstOrDefaultResponse();
-
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
-
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         result.Should().BeFalse();
         packets.Should().HaveCount(10);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Import_WhenConflictWithForceImport_OverwritesConflictingPackets()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
         await context.AddTestPacketsAsync(10, DateTime.Now.AddHours(-1), DateTime.Now.AddMinutes(-10));
 
         var packetDtos = new PacketDto[]
@@ -850,18 +928,21 @@ public class FeatureActionTests
 
         var exportDto = new ConnectorPacketsExportDto([.. packetDtos]);
         var importDto = new ConnectorPacketsTryImportDto(exportDto, true);
+        
+        // Act
         var result = await _messenger
             .AskAsync<ConnectorPacketsTryImportDto, bool>(ConnectorContract.PacketTryImportTopic(_metadata.ConnectorIdentifier), importDto)
             .FirstOrDefaultResponse();
 
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
         var importedPackets = packets.Where(p => p.Id > 10).ToArray();
-
+        
+        // Assert
         result.Should().BeTrue();
         packets.Should().HaveCount(11);
         importedPackets.Should().HaveCount(3);
 
-        for (int i = 0; i < 3; i++)
+        for (var i = 0; i < 3; i++)
         {
             importedPackets[i].BinaryData.Should().BeEquivalentTo(Encoding.UTF8.GetBytes($"Binary{packetDtos[i].Data}"));
             importedPackets[i].DateCreated.Should().Be(packetDtos[i].DateCreated);
@@ -875,12 +956,13 @@ public class FeatureActionTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Import_WhenConflictOnExactDateTimeWithoutForceImport_DoesNotImport()
     {
+        // Arrange
         var dateTimeNow = DateTime.Now;
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
 
         await context.Packet.AddAsync(new()
         {
@@ -888,9 +970,9 @@ public class FeatureActionTests
             Channel = "TestChannel",
             DateCreated = dateTimeNow,
             Status = PacketStatus.Processed,
-        });
+        }, _cancellationTokenSource.Token);
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(_cancellationTokenSource.Token);
 
         var packetDto = new PacketDto
         {
@@ -904,18 +986,19 @@ public class FeatureActionTests
 
         var exportDto = new ConnectorPacketsExportDto([packetDto]);
         var importDto = new ConnectorPacketsTryImportDto(exportDto, false);
+        
+        // Act
         var result = await _messenger
             .AskAsync<ConnectorPacketsTryImportDto, bool>(ConnectorContract.PacketTryImportTopic(_metadata.ConnectorIdentifier), importDto)
             .FirstOrDefaultResponse();
-
-        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync();
-
+        var packets = await context.Packet.AsNoTracking().OrderBy(p => p.Id).ToArrayAsync(_cancellationTokenSource.Token);
+        
+        // Assert
         result.Should().BeFalse();
         packets.Should().ContainSingle();
     }
 
-    [TestCleanup]
-    public async Task Cleanup()
+    public async ValueTask DisposeAsync()
     {
         await _cancellationTokenSource.CancelAsync();
         _cancellationTokenSource.Dispose();

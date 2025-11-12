@@ -3,25 +3,26 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 using System.Net;
-using System.Text.Json;
 using System.Text;
 using System.Net.Mime;
 
 namespace eHub.Tests.Connectors.Http;
 
-[TestClass]
 public class HttpUtilTests
 {
     private const string ConnectorName = "MyConnector";
 
-    [TestMethod]
+    [Fact]
     public async Task GetConnectorResponseFromIResult_WithTextResult_ReturnsExpectedConnectorResponse()
     {
-        var content = "some text response";
+        // Arrange
+        const string content = "some text response";
         var result = Results.Text(content, MediaTypeNames.Text.Plain, statusCode: 201);
-
+        
+        // Act
         var connectorResponse = await HttpUtil.GetConnectorResponseFromIResult(result);
-
+        
+        // Assert
         connectorResponse.Should().NotBeNull();
         connectorResponse.Http.Should().NotBeNull();
         Encoding.UTF8.GetString(connectorResponse.Content.Span).Should().Be(content);
@@ -29,9 +30,10 @@ public class HttpUtilTests
         connectorResponse.Http.StatusCode.Should().Be(201);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetConnectorResponseFromIResult_WithHeaders_ReturnsExpectedConnectorResponse()
     {
+        // Arrange
         var headers = new Dictionary<string, StringValues>
         {
             { "X-Custom-Header", "CustomValue" },
@@ -39,9 +41,11 @@ public class HttpUtilTests
         };
 
         var result = new HeadersResult(headers, 202);
-
+        
+        // Act
         var connectorResponse = await HttpUtil.GetConnectorResponseFromIResult(result);
-
+        
+        // Assert
         connectorResponse.Should().NotBeNull();
         connectorResponse.Http.Should().NotBeNull();
         connectorResponse.Http.StatusCode.Should().Be(202);
@@ -50,13 +54,16 @@ public class HttpUtilTests
         connectorResponse.Http.Headers["X-Another-Header"].ToArray().Should().BeEquivalentTo("Value1", "Value2");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetConnectorResponseFromIResult_WithEmptyResult_ReturnsEmptyConnectorResponse()
     {
+        // Arrange
         var result = Results.Empty;
-
+        
+        // Act
         var response = await HttpUtil.GetConnectorResponseFromIResult(result);
-
+        
+        // Assert
         response.Should().NotBeNull();
         response.Content.ToArray().Should().BeEmpty();
         response.ContentType.Should().Be(MediaTypeNames.Application.Octet);
@@ -66,17 +73,20 @@ public class HttpUtilTests
         response.Http.Headers.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetConnectorResponseFromHttpResponseMessage_WithContent_ReturnsExpectedConnectorResponse()
     {
-        var content = "some text response";
+        // Arrange
+        const string content = "some text response";
         var messageResponse = new HttpResponseMessage(HttpStatusCode.Created)
         {
             Content = new StringContent(content, Encoding.UTF8, MediaTypeNames.Text.Plain)
         };
-
+        
+        // Act
         var response = await HttpUtil.GetConnectorResponseFromHttpResponseMessage(messageResponse, ConnectorName);
-
+        
+        // Assert
         response.Should().NotBeNull();
         Encoding.UTF8.GetString(response.Content.Span).Should().Be(content);
         response.ContentType.Should().Be(MediaTypeNames.Text.Plain);
@@ -85,16 +95,18 @@ public class HttpUtilTests
         response.Http.StatusCode.Should().Be(201);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetConnectorResponseFromHttpResponseMessage_WithHeaders_ReturnsExpectedConnectorResponse()
     {
+        // Arrange
         var messageResponse = new HttpResponseMessage(HttpStatusCode.Accepted);
-
         messageResponse.Headers.Add("X-Custom-Header", "CustomValue");
         messageResponse.Headers.Add("X-Another-Header", [ "Value1", "Value2" ]);
-
+        
+        // Act
         var response = await HttpUtil.GetConnectorResponseFromHttpResponseMessage(messageResponse, ConnectorName);
-
+        
+        // Assert
         response.Should().NotBeNull();
         response.ConnectorName.Should().Be(ConnectorName);
         response.Http.Should().NotBeNull();
@@ -104,14 +116,16 @@ public class HttpUtilTests
         response.Http.Headers["X-Another-Header"].ToArray().Should().BeEquivalentTo("Value1", "Value2");
     }
 
-
-    [TestMethod]
+    [Fact]
     public async Task GetConnectorResponseFromHttpResponseMessage_WithEmptyContent_ReturnsEmptyConnectorResponse()
     {
+        // Arrange
         var messageResponse = new HttpResponseMessage();
-
+        
+        // Act
         var response = await HttpUtil.GetConnectorResponseFromHttpResponseMessage(messageResponse, ConnectorName);
-
+        
+        // Assert
         response.Should().NotBeNull();
         response.Content.IsEmpty.Should().BeTrue();
         response.ContentType.Should().Be(MediaTypeNames.Application.Octet);
@@ -122,15 +136,18 @@ public class HttpUtilTests
         response.Http.Headers.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetConnectorRequestFromHttpRequest_WhenEmpty_ReturnsEmptyConnectorRequest()
     {
+        // Arrange
         var ctx = new DefaultHttpContext();
         var req = ctx.Request;
         req.Body = new MemoryStream();
-
+        
+        // Act
         var connectorRequest = await HttpUtil.GetConnectorRequestFromHttpRequest(req, ConnectorName);
-
+        
+        // Assert
         connectorRequest.Content.IsEmpty.Should().BeTrue();
         connectorRequest.ContentType.Should().Be(MediaTypeNames.Application.Octet);
         connectorRequest.ConnectorName.Should().Be(ConnectorName);
@@ -141,10 +158,11 @@ public class HttpUtilTests
         connectorRequest.Http.Headers.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetConnectorRequestFromHttpRequest_WhenPopulated_ReturnsExpectedConnectorRequest()
     {
-        var content = "request body";
+        // Arrange
+        const string content = "request body";
         var context = new DefaultHttpContext();
         var request = context.Request;
         request.Body = new MemoryStream(Encoding.UTF8.GetBytes(content));
@@ -154,9 +172,11 @@ public class HttpUtilTests
         request.RouteValues["id"] = 42;
         request.Headers["X-Custom-Header"] = "CustomValue";
         request.Headers["X-Another-Header"] = new StringValues(["Value1", "Value2"]);
-
+        
+        // Act
         var connectorRequest = await HttpUtil.GetConnectorRequestFromHttpRequest(request, ConnectorName);
-
+        
+        // Assert
         connectorRequest.Should().NotBeNull();
         connectorRequest.Http.Should().NotBeNull();
         connectorRequest.Http.Headers.Should().NotBeNull();

@@ -6,12 +6,12 @@ using NSubstitute;
 
 namespace eHub.Tests.Authentication;
 
-[TestClass]
 public class UserServiceTests
 {
-    [TestMethod]
+    [Fact]
     public async Task GetAll_WithBasicConfig_ReturnsDummyUsers()
     {
+        // Arrange
         var config = new AuthenticationConfig
         {
             Basic = new BasicAuthenticationConfig
@@ -26,50 +26,58 @@ public class UserServiceTests
 
         var options = Substitute.For<IOptionsSnapshot<AuthenticationConfig>>();
         options.Value.Returns(config);
-
         var userService = new UserService(options);
-
+        
+        // Act
         var users = await userService.GetAll();
-
-        users.Should().HaveCount(2);
-        users.Should().BeEquivalentTo(config.Basic.DummyUsers);
+        
+        // Assert
+        var userArray = users.ToArray();
+        userArray.Should().HaveCount(2);
+        userArray.Should().BeEquivalentTo(config.Basic.DummyUsers);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetAll_WhenBasicConfigIsNull_ReturnsEmpty()
     {
+        // Arrange
         var config = new AuthenticationConfig { Basic = null };
         var options = Substitute.For<IOptionsSnapshot<AuthenticationConfig>>();
         options.Value.Returns(config);
-
         var userService = new UserService(options);
 
+        // Act
         var users = await userService.GetAll();
-
+        
+        // Assert
         users.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetAll_WhenDummyUsersEmpty_ReturnsEmpty()
     {
+        // Arrange
         var config = new AuthenticationConfig
         {
-            Basic = new() { DummyUsers = [] }
+            Basic = new BasicAuthenticationConfig { DummyUsers = [] }
         };
-
+        
         var options = Substitute.For<IOptionsSnapshot<AuthenticationConfig>>();
         options.Value.Returns(config);
 
         var userService = new UserService(options);
 
+        // Act
         var users = await userService.GetAll();
-
+        
+        // Assert
         users.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Authenticate_WithValidCredentials_ReturnsUser()
     {
+        // Arrange
         var config = new AuthenticationConfig
         {
             Basic = new BasicAuthenticationConfig
@@ -82,42 +90,44 @@ public class UserServiceTests
             }
         };
 
+        // Act
         var options = Substitute.For<IOptionsSnapshot<AuthenticationConfig>>();
         options.Value.Returns(config);
 
         var userService = new UserService(options);
-
         var user = await userService.Authenticate("Alice", "password123");
-
+        // Assert
         user.Should().NotBeNull();
         user.Username.Should().Be("Alice");
         user.Password.Should().Be("password123");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Authenticate_WhenDisabled_ReturnsSameUser()
     {
+        // Arrange
         var config = new AuthenticationConfig
         {
             Enabled = false,
             Basic = new() { DummyUsers = [] }
         };
 
+        // Act
         var options = Substitute.For<IOptionsSnapshot<AuthenticationConfig>>();
         options.Value.Returns(config);
 
         var userService = new UserService(options);
-
         var user = await userService.Authenticate("Alice", "password123");
-
-        user.Should().NotBeNull(); ;
+        // Assert
+        user.Should().NotBeNull();
         user.Username.Should().Be("Alice");
         user.Password.Should().Be("password123");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Authenticate_WithInvalidUsername_ReturnsNull()
     {
+        // Arrange
         var config = new AuthenticationConfig
         {
             Basic = new BasicAuthenticationConfig
@@ -126,19 +136,20 @@ public class UserServiceTests
             }
         };
 
+        // Act
         var options = Substitute.For<IOptionsSnapshot<AuthenticationConfig>>();
         options.Value.Returns(config);
 
         var userService = new UserService(options);
-
         var user = await userService.Authenticate("alice", "password123");
-
+        // Assert
         user.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Authenticate_WithInvalidPassword_ReturnsNull()
     {
+        // Arrange
         var config = new AuthenticationConfig
         {
             Basic = new BasicAuthenticationConfig
@@ -147,46 +158,48 @@ public class UserServiceTests
             }
         };
 
+        // Act
         var options = Substitute.For<IOptionsSnapshot<AuthenticationConfig>>();
         options.Value.Returns(config);
 
         var userService = new UserService(options);
-
         var user = await userService.Authenticate("Alice", "PASSWORD123");
-
+        // Assert
         user.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Authenticate_WhenDummyUsersEmpty_ReturnsNull()
     {
+        // Arrange
         var config = new AuthenticationConfig
         {
             Basic = new BasicAuthenticationConfig { DummyUsers = [] }
         };
 
+        // Act
         var options = Substitute.For<IOptionsSnapshot<AuthenticationConfig>>();
         options.Value.Returns(config);
 
         var userService = new UserService(options);
-
         var user = await userService.Authenticate("Alice", "password123");
-
+        // Assert
         user.Should().BeNull();
     }
 
 
-    [TestMethod]
+    [Fact]
     public async Task Authenticate_WhenBasicConfigIsNull_ReturnsNull()
     {
+        // Arrange
         var config = new AuthenticationConfig { Basic = null };
         var options = Substitute.For<IOptionsSnapshot<AuthenticationConfig>>();
         options.Value.Returns(config);
 
+        // Act
         var userService = new UserService(options);
-
         var user = await userService.Authenticate("Alice", "password123");
-
+        // Assert
         user.Should().BeNull();
     }
 }

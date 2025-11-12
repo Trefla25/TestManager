@@ -1,17 +1,15 @@
-﻿using eHub.Contracts;
+using eHub.Contracts;
 using eHub.PlugIn.UI;
 using eHub.UI.Services;
 using eHub.UI.State;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 
 namespace eHub.UI.Tests.State;
 
-[TestClass]
-public class CombinedContextManagerTests
+public class CombinedContextManagerTests : IAsyncLifetime
 {
     private readonly Dictionary<ConnectorIdentifier, IConnectorContext> _providerContexts = [];
     private TestCombinedManager? _combinedManager;
@@ -24,8 +22,7 @@ public class CombinedContextManagerTests
     private IConnectorRegistry _connectorRegistry = null!;
     private ILogger _logger = null!;
 
-    [TestInitialize]
-    public void TestInitialize()
+    public ValueTask InitializeAsync()
     {
         _connectorRegistry = Substitute.For<IConnectorRegistry>();
         _connectorA = Substitute.For<IConnectorContext>();
@@ -38,46 +35,48 @@ public class CombinedContextManagerTests
 
         _connectorUiData = new ConnectorUiData("Combined", UIViewConfig.CustomUIViewType,
             new UIViewConfig() { Views = new() { { "All", new() } } });
+        
+        return ValueTask.CompletedTask;
     }
 
-    [TestMethod]
+    [Fact]
     public void Constructor_WhenNoChannelsDefined_DoesNotAddContexts()
     {
         // Act
         _combinedManager = CreateCombinedManager();
-
+        
         // Assert
         _combinedManager.Connectors.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public void Constructor_WhenNoChannelsActive_DoesNotAddContexts()
     {
         // Arrange
         SetupExpectedConnectors("ConnectorA", "ConnectorB");
-
+        
         // Act
         _combinedManager = CreateCombinedManager();
-
+        
         // Assert
         _combinedManager.Connectors.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public void Constructor_WhenGetContextThrows_DoesNotAddContexts()
     {
         // Arrange
         SetupExpectedConnectors("ConnectorA", "ConnectorB");
         SetupActiveConnectors(_identifierA, _identifierB);
-
+        
         // Act
         _combinedManager = CreateCombinedManager();
-
+        
         // Assert
         _combinedManager.Connectors.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public void Constructor_WhenConnectorsActive_AddsContexts()
     {
         // Arrange
@@ -86,10 +85,10 @@ public class CombinedContextManagerTests
 
         _providerContexts.Add(_identifierA, _connectorA);
         _providerContexts.Add(_identifierB, _connectorB);
-
+        
         // Act
         _combinedManager = CreateCombinedManager();
-
+        
         // Assert
         _combinedManager.Connectors.Should().ContainKey("ConnectorA");
         _combinedManager.Connectors.Should().ContainKey("ConnectorB");
@@ -97,7 +96,7 @@ public class CombinedContextManagerTests
         _combinedManager.Connectors["ConnectorB"].Should().BeSameAs(_connectorB);
     }
 
-    [TestMethod]
+    [Fact]
     public void Constructor_WithDuplicateConnectorNames_AddsContexts()
     {
         // Arrange
@@ -111,10 +110,10 @@ public class CombinedContextManagerTests
         _providerContexts.Add(_identifierA, _connectorA);
         _providerContexts.Add(_identifierB, _connectorB);
         _providerContexts.Add(otherIdentifierA, otherConnectorA);
-
+        
         // Act
         _combinedManager = CreateCombinedManager();
-
+        
         // Assert
         _combinedManager.Connectors.Should().HaveCount(2);
         _combinedManager.Connectors.Should().ContainKey("ConnectorA");
@@ -123,7 +122,7 @@ public class CombinedContextManagerTests
         _combinedManager.Connectors["ConnectorB"].Should().BeSameAs(_connectorB);
     }
 
-    [TestMethod]
+    [Fact]
     public void InnerConnectorPacketsChanged_WhenRaised_RaisesManagerEvent()
     {
         // Arrange
@@ -133,19 +132,19 @@ public class CombinedContextManagerTests
         _providerContexts.Add(_identifierA, _connectorA);
         _providerContexts.Add(_identifierB, _connectorB);
 
+        // Act
         _combinedManager = CreateCombinedManager();
 
-        // Act
         _connectorA.OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(_identifierA, ConnectorPacketsChangedDto.Any);
         _connectorB.OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(_identifierB, ConnectorPacketsChangedDto.Any);
-
+        
         // Assert
         _combinedManager.Notifications.Should().HaveCount(2);
         _combinedManager.Notifications.Should().Contain(_identifierA);
         _combinedManager.Notifications.Should().Contain(_identifierB);
     }
 
-    [TestMethod]
+    [Fact]
     public void ActiveConnectorsChanged_WhenConnectorAdded_AddsContext()
     {
         // Arrange
@@ -155,12 +154,12 @@ public class CombinedContextManagerTests
         _providerContexts.Add(_identifierA, _connectorA);
         _providerContexts.Add(_identifierB, _connectorB);
 
+        // Act
         _combinedManager = CreateCombinedManager();
 
-        // Act
         SetupActiveConnectors(_identifierA, _identifierB);
         _connectorRegistry.ActiveConnectorsChanged += Raise.Event<ConnectorsChangedDelegate>();
-
+        
         // Assert
         _combinedManager.Connectors.Should().ContainKey("ConnectorA");
         _combinedManager.Connectors.Should().ContainKey("ConnectorB");
@@ -168,7 +167,7 @@ public class CombinedContextManagerTests
         _combinedManager.Connectors["ConnectorB"].Should().BeSameAs(_connectorB);
     }
 
-    [TestMethod]
+    [Fact]
     public void ActiveConnectorsChanged_WhenConnectorRemoved_RemovesAndDisposesContext()
     {
         // Arrange
@@ -178,13 +177,13 @@ public class CombinedContextManagerTests
         _providerContexts.Add(_identifierA, _connectorA);
         _providerContexts.Add(_identifierB, _connectorB);
 
+        // Act
         _combinedManager = CreateCombinedManager();
 
-        // Act
         SetupActiveConnectors(_identifierB);
         _connectorRegistry.ActiveConnectorsChanged += Raise.Event<ConnectorsChangedDelegate>();
         _connectorA.OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(_identifierA, ConnectorPacketsChangedDto.Any);
-
+        
         // Assert
         _combinedManager.Connectors.Should().NotContainKey("ConnectorA");
         _combinedManager.Connectors.Should().ContainKey("ConnectorB");
@@ -193,8 +192,7 @@ public class CombinedContextManagerTests
         _ = _connectorA.Received(1).DisposeAsync().AsTask();
     }
 
-    [TestCleanup]
-    public async Task TestCleanup()
+    public async ValueTask DisposeAsync()
     {
         if (_combinedManager != null)
         {

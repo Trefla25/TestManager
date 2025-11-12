@@ -13,31 +13,26 @@ using eHub.Scripting.Connectors.Services;
 using Microsoft.Extensions.Logging;
 using eHub.PlugIn.UI;
 using NSubstitute.ExceptionExtensions;
-using eHub.Contracts;
-using System.Linq.Expressions;
 using eHub.Tests.Helper;
-using Microsoft.EntityFrameworkCore.Query.Internal;
 
 namespace eHub.Tests.Connectors.PacketTransfer.UI;
 
-[TestClass]
-public class PacketDtoServiceTests
+public class PacketDtoServiceTests : IAsyncLifetime
 {
     private const string TestChannel = "TestChannel";
     private const string ErrorChannel = "ErroChannel";
 
-    private PacketDtoService _packetDtoService = default!;
-    private ConnectorMetadata _metadata = default!;
-    private ConnectorTemplate _connectorTemplate = default!;
-    private ILoggerFactory _loggerFactory = default!;
-    private IPacketTransfer _packetTransfer = default!;
-    private IPacketConverter _packetConverter = default!;
-    private IDbContextFactory<HubDbContext> _dbContextFactory = default!;
-    private ILogger<PacketDtoService> _logger = default!;
-    private SqliteConnection _connection = default!;
+    private PacketDtoService _packetDtoService = null!;
+    private ConnectorMetadata _metadata = null!;
+    private ConnectorTemplate _connectorTemplate = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private IPacketTransfer _packetTransfer = null!;
+    private IPacketConverter _packetConverter = null!;
+    private IDbContextFactory<HubDbContext> _dbContextFactory = null!;
+    private ILogger<PacketDtoService> _logger = null!;
+    private SqliteConnection _connection = null!;
 
-    [TestInitialize]
-    public async Task TestInitialize()
+    public async ValueTask InitializeAsync()
     {
         _connection = new SqliteConnection(DbHelper.InMemoryConnectionString);
         await _connection.OpenAsync();
@@ -77,9 +72,10 @@ public class PacketDtoServiceTests
         await context.Database.EnsureCreatedAsync();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task BuildDtoAsync_WhenConversionSucceeds_ReturnsConvertedDto()
     {
+        // Arrange
         var packet = new Packet
         {
             Id = 4,
@@ -94,16 +90,18 @@ public class PacketDtoServiceTests
             RetryCount = 3
         };
 
-        var expectedData = "{\"Id\": 4}";
-        var expectedDataPreview = "Id: 4";
-        var expectedDataType = UIDataTypes.Json;
+        const string expectedData = "{\"Id\": 4}";
+        const string expectedDataPreview = "Id: 4";
+        const string expectedDataType = UIDataTypes.Json;
 
-        _packetTransfer.Converter.PacketToUIDataConverter(Arg.Any<PacketData>())
+        _packetTransfer.Converter.PacketToUIDataConverter(Arg.Any<PacketData>(), Arg.Any<CancellationToken>())
             .Returns(new UIConversionInfo { Data = expectedData, DataPreview = expectedDataPreview, DataType = expectedDataType });
-
+        
+        // Act
         var packetDto = await _packetDtoService.BuildDtoAsync(packet);
-
-        await _packetTransfer.Converter.Received(1).PacketToUIDataConverter(Arg.Any<PacketData>());
+        
+        // Assert
+        await _packetTransfer.Converter.Received(1).PacketToUIDataConverter(Arg.Any<PacketData>(), Arg.Any<CancellationToken>());
 
         // Properties should be copied from the packet
         AssertPacketDtoMatchesPacket(packet, packetDto);
@@ -118,9 +116,10 @@ public class PacketDtoServiceTests
         packetDto.ConnectorName.Should().Be(_metadata.TemplateName);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task BuildDtoAsync_WithNoResendChannel_ReturnsDtoWithCanResendFalse()
     {
+        // Arrange
         var packet = new Packet
         {
             Id = 2,
@@ -135,16 +134,18 @@ public class PacketDtoServiceTests
             RetryCount = 0
         };
 
-        var expectedData = "Error";
-        var expectedDataPreview = "Err";
-        var expectedDataType = UIDataTypes.Plaintext;
+        const string expectedData = "Error";
+        const string expectedDataPreview = "Err";
+        const string expectedDataType = UIDataTypes.Plaintext;
 
-        _packetTransfer.Converter.PacketToUIDataConverter(Arg.Any<PacketData>())
+        _packetTransfer.Converter.PacketToUIDataConverter(Arg.Any<PacketData>(), Arg.Any<CancellationToken>())
             .Returns(new UIConversionInfo { Data = expectedData, DataPreview = expectedDataPreview, DataType = expectedDataType });
-
+        
+        // Act
         var packetDto = await _packetDtoService.BuildDtoAsync(packet);
-
-        await _packetTransfer.Converter.Received(1).PacketToUIDataConverter(Arg.Any<PacketData>());
+        
+        // Assert
+        await _packetTransfer.Converter.Received(1).PacketToUIDataConverter(Arg.Any<PacketData>(), Arg.Any<CancellationToken>());
 
         // Properties should be copied from the packet
         AssertPacketDtoMatchesPacket(packet, packetDto);
@@ -159,9 +160,10 @@ public class PacketDtoServiceTests
         packetDto.ConnectorName.Should().Be(_metadata.TemplateName);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task BuildDtoAsync_WithUnknownChannel_ReturnsDtoWithCanResendFalse()
     {
+        // Arrange
         var packet = new Packet
         {
             Id = 10,
@@ -173,11 +175,13 @@ public class PacketDtoServiceTests
 
         _packetTransfer.Converter.Returns(new StringConverter());
 
+        // Act
         var packetDto = await _packetDtoService.BuildDtoAsync(packet);
-
+        
+        // Assert
         // Properties should be copied from the packet
         AssertPacketDtoMatchesPacket(packet, packetDto);
-
+        
         // Data properties should be set by the conversion
         packetDto.Data.Should().Be("Data");
         packetDto.PreviewData.Should().Be("Data");
@@ -188,12 +192,13 @@ public class PacketDtoServiceTests
         packetDto.ConnectorName.Should().Be(_metadata.TemplateName);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task BuildDtoAsync_WhenConversionFails_UsesDefaultConversion()
     {
-        var expectedData = "Lorem Ipsum is simply dummy text of the printing and typesetting industry.";
-        var expectedDataPreview = "Lorem Ipsum is simpl";
-        var expectedDataType = UIDataTypes.Plaintext;
+        // Arrange
+        const string expectedData = "Lorem Ipsum is simply dummy text of the printing and typesetting industry.";
+        const string expectedDataPreview = "Lorem Ipsum is simpl";
+        const string expectedDataType = UIDataTypes.Plaintext;
 
         var packet = new Packet
         {
@@ -206,8 +211,10 @@ public class PacketDtoServiceTests
 
         _packetTransfer.Converter.Throws<NotImplementedException>();
 
+        // Act
         var packetDto = await _packetDtoService.BuildDtoAsync(packet);
-
+        
+        // Assert
         // Properties should be copied from the packet
         AssertPacketDtoMatchesPacket(packet, packetDto);
 
@@ -221,30 +228,35 @@ public class PacketDtoServiceTests
         packetDto.ConnectorName.Should().Be(_metadata.TemplateName);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task FillChildAndParentPacketsAsync_WithEmptyList_NoChanges()
     {
+        // Arrange
         var ignoredIds = new HashSet<long>();
         var packets = new List<PacketDto>();
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
-
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        
+        // Act
         await _packetDtoService.FillChildAndParentPacketsAsync(context, packets, ignoredIds);
-
+        
+        // Assert
         packets.Should().BeEmpty();
         ignoredIds.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task FillChildAndParentPacketsAsync_WithNoMatchingParents_NoChanges()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
             new() { Channel = TestChannel, Status = PacketStatus.Error, DateCreated = DateTime.Now}
         ]);
-        await context.SaveChangesAsync();
+        
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var ignoredIds = new HashSet<long>();
         var packets = new List<PacketDto>
@@ -252,23 +264,27 @@ public class PacketDtoServiceTests
             new() { Id = 10, ParentId = 98, Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now },
             new() { Id = 11, ParentId = 99, Channel = TestChannel, Status = PacketStatus.FatalError, DateCreated = DateTime.Now }
         };
-
+        
+        // Act
         await _packetDtoService.FillChildAndParentPacketsAsync(context, packets, ignoredIds);
-
+        
+        // Assert
         packets.Select(p => p.Id).Should().BeEquivalentTo([10, 11]);
         ignoredIds.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task FillChildAndParentPacketsAsync_WithChildPackets_AddsParents()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
             new() { Channel = TestChannel, Status = PacketStatus.Error, DateCreated = DateTime.Now}
         ]);
-        await context.SaveChangesAsync();
+        
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var ignoredIds = new HashSet<long>();
         var packets = new List<PacketDto>
@@ -277,26 +293,30 @@ public class PacketDtoServiceTests
             new() { Id = 11, ParentId = 2, Channel = TestChannel, Status = PacketStatus.FatalError, DateCreated = DateTime.Now },
             new() { Id = 12, ParentId = 99, Channel = TestChannel, Status = PacketStatus.ManualStop, DateCreated = DateTime.Now }
         };
-
+        
+        // Act
         await _packetDtoService.FillChildAndParentPacketsAsync(context, packets, ignoredIds);
-
+        
+        // Assert
         packets.Select(p => p.Id).Should().BeEquivalentTo([1, 2, 10, 11, 12]);
 
         // The added parents should be ignored on the next call
         ignoredIds.Should().BeEquivalentTo([1, 2]);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task FillChildAndParentPacketsAsync_WithIgnoredParents_DoesNotAddParents()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
             new() { Channel = TestChannel, Status = PacketStatus.Error, DateCreated = DateTime.Now},
             new() { Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now}
         ]);
-        await context.SaveChangesAsync();
+        
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var ignoredIds = new HashSet<long> { 1, 2 };
         var packets = new List<PacketDto>
@@ -307,17 +327,20 @@ public class PacketDtoServiceTests
             new() { Id = 13, ParentId = 99, Channel = TestChannel, Status = PacketStatus.ManualStop, DateCreated = DateTime.Now },
             new() { Id = 14, ParentId = 3, Channel = TestChannel, Status = PacketStatus.ManualStop, DateCreated = DateTime.Now }
         };
-
+        
+        // Act
         await _packetDtoService.FillChildAndParentPacketsAsync(context, packets, ignoredIds);
-
+        
+        // Assert
         packets.Select(p => p.Id).Should().BeEquivalentTo([3, 10, 11, 12, 13, 14]);
         ignoredIds.Should().BeEquivalentTo([1, 2, 3]);
     }
 
-    [TestMethod]
-    public async Task FillChildAndParentPacketsAsync_WithParentPackets_AddsChilds()
+    [Fact]
+    public async Task FillChildAndParentPacketsAsync_WithParentPackets_AddsChildren()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { ParentId = 10, Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { ParentId = 12, Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -325,7 +348,8 @@ public class PacketDtoServiceTests
             new() { ParentId = 99, Channel = TestChannel, Status = PacketStatus.Error, DateCreated = DateTime.Now},
             new() { ParentId = 13, Channel = TestChannel, Status = PacketStatus.Error, DateCreated = DateTime.Now}
         ]);
-        await context.SaveChangesAsync();
+        
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var ignoredIds = new HashSet<long>();
         var packets = new List<PacketDto>
@@ -335,19 +359,22 @@ public class PacketDtoServiceTests
             new() { Id = 12, ParentId = null, Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now },
             new() { Id = 13, ParentId = null, Channel = TestChannel, Status = PacketStatus.FatalError, DateCreated = DateTime.Now },
         };
-
+        
+        // Act
         await _packetDtoService.FillChildAndParentPacketsAsync(context, packets, ignoredIds);
-
+        
+        // Assert
         packets.Select(p => p.Id).Should().BeEquivalentTo([1, 2, 3, 5, 10, 11, 12, 13]);
 
-        // The added childs should be ignored on the next call
+        // The added children should be ignored on the next call
         ignoredIds.Should().BeEquivalentTo([1, 2, 3, 5]);
     }
 
-    [TestMethod]
-    public async Task FillChildAndParentPacketsAsync_WithIgnoredChilds_DoesNotAddChilds()
+    [Fact]
+    public async Task FillChildAndParentPacketsAsync_WithIgnoredChildren_DoesNotAddChildren()
     {
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        // Arrange
+        await using var context = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         await context.Packet.AddRangeAsync([
             new() { ParentId = 10, Channel = TestChannel, Status = PacketStatus.Enqueued, DateCreated = DateTime.Now},
             new() { ParentId = 12, Channel = TestChannel, Status = PacketStatus.Processed, DateCreated = DateTime.Now},
@@ -355,7 +382,8 @@ public class PacketDtoServiceTests
             new() { ParentId = 99, Channel = TestChannel, Status = PacketStatus.Error, DateCreated = DateTime.Now},
             new() { ParentId = 13, Channel = TestChannel, Status = PacketStatus.Error, DateCreated = DateTime.Now}
         ]);
-        await context.SaveChangesAsync();
+        
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var ignoredIds = new HashSet<long> { 1, 3 };
         var packets = new List<PacketDto>
@@ -365,9 +393,11 @@ public class PacketDtoServiceTests
             new() { Id = 12, ParentId = null, Channel = TestChannel, Status = PacketStatus.InProgress, DateCreated = DateTime.Now },
             new() { Id = 13, ParentId = null, Channel = TestChannel, Status = PacketStatus.FatalError, DateCreated = DateTime.Now },
         };
-
+        
+        // Act
         await _packetDtoService.FillChildAndParentPacketsAsync(context, packets, ignoredIds);
-
+        
+        // Assert
         packets.Select(p => p.Id).Should().BeEquivalentTo([2, 5, 10, 11, 12, 13]);
         ignoredIds.Should().BeEquivalentTo([1, 2, 3, 5]);
     }
@@ -385,8 +415,7 @@ public class PacketDtoServiceTests
         dto.RetryCount.Should().Be(packet.RetryCount);
     }
 
-    [TestCleanup]
-    public async Task TestCleanup()
+    public async ValueTask DisposeAsync()
     {
         await _connection.CloseAsync();
         await _connection.DisposeAsync();

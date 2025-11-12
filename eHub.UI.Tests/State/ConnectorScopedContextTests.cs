@@ -6,26 +6,22 @@ using eHub.Contracts;
 using eHub.Contracts.UIConfig;
 using eHub.PlugIn.UI;
 using eHub.UI.State;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 using eHub.UI.Models;
 using Microsoft.Extensions.Logging.Abstractions;
 using MudBlazor;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace eHub.UI.Tests.State;
 
-[TestClass]
-public class ConnectorScopedContextTests
+public class ConnectorScopedContextTests  : IAsyncLifetime
 {
-    private ConnectorScopedContext _connectorScopedContext = default!;
+    private ConnectorScopedContext _connectorScopedContext = null!;
     private ConnectorIdentifier _connectorIdentifier;
-    private IConnectorContext _connectorContext = default!;
-    private ConnectorUiData _connectorUiData = default!;
-    private IMessenger _messenger = default!;
+    private IConnectorContext _connectorContext = null!;
+    private ConnectorUiData _connectorUiData = null!;
+    private IMessenger _messenger = null!;
 
-    [TestInitialize]
-    public void TestInitialize()
+    public ValueTask InitializeAsync()
     {
         _connectorIdentifier = new ConnectorIdentifier(Guid.NewGuid().ToString(), "TestConnector");
         _connectorContext = Substitute.For<IConnectorContext>();
@@ -37,21 +33,27 @@ public class ConnectorScopedContextTests
             _connectorUiData,
             _messenger,
             NullLogger<ConnectorScopedContext>.Instance);
+
+        return ValueTask.CompletedTask;
     }
 
-    [TestMethod]
+    [Fact]
     public void GetUIViewConfig_WhenCalled_ReturnsExpectedConfig()
     {
+        // Arrange
         _connectorContext.GetUIViewConfig().Returns(_connectorUiData.UIViewConfig);
-
+        
+        // Act
         var result = _connectorScopedContext.GetUIViewConfig();
-
+        
+        // Assert
         result.Should().Be(_connectorUiData.UIViewConfig);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetCustomFilters_ReturnsExpectedFilters()
     {
+        // Arrange
         var customFilters = new Dictionary<string, Type>
         {
             { "Filter1", typeof(int) },
@@ -61,14 +63,17 @@ public class ConnectorScopedContextTests
 
         _connectorContext.GetCustomFilters().Returns(customFilters);
         
+        // Act
         var result = _connectorScopedContext.GetCustomFilters();
-
+        
+        // Assert
         result.Should().BeSameAs(customFilters);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ConnectorPacketsChangedHandler_WhenInvoked_ReloadsPackets()
     {
+        // Arrange
         var now = DateTime.Now;
         var packet1 = new PacketDto { Id = 1, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "A", DateCreated = now, Data = "Data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packet2 = new PacketDto { Id = 2, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "B", DateCreated = now, Data = "Data2", ParentId = null, Status = PacketStatus.Enqueued };
@@ -93,10 +98,11 @@ public class ConnectorScopedContextTests
             tcs.TrySetResult();
         };
 
+        // Act
         _connectorContext.OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(_connectorIdentifier, ConnectorPacketsChangedDto.Any);
-
-        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(1));
-
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        
+        // Assert
         _connectorScopedContext.Packets.Should().HaveCount(2);
         _connectorScopedContext.Packets.Should().Contain([packet1, packet2]);
 
@@ -108,9 +114,10 @@ public class ConnectorScopedContextTests
         raisedEvents.First().Changed.Should().Be(ConnectorPacketsChangedDto.Any);
     }
 
-    [TestMethod]
+    [Fact]
     public void ApplyFilter_WithNewValues_UpdatesFilters()
     {
+        // Arrange
         var newStartDateTime = new DateTime(2024, 1, 1);
         var newEndDateTime = new DateTime(2024, 12, 31);
         var newColumnFilters = new List<PacketColumnFilter>
@@ -118,32 +125,38 @@ public class ConnectorScopedContextTests
             new() { ColumnName = nameof(PacketDto.Channel), Operator = FilterOperator.String.Contains, Value = "Value1" },
             new() { ColumnName = nameof(PacketDto.Id), Operator = FilterOperator.Number.GreaterThan, Value = "10" },
         };
-
+        
+        // Act
         _connectorScopedContext.ApplyFilter(newStartDateTime, newEndDateTime, newColumnFilters);
-
+        
+        // Assert
         _connectorScopedContext.FilterOptions.StartDateTime.Should().Be(newStartDateTime);
         _connectorScopedContext.FilterOptions.EndDateTime.Should().Be(newEndDateTime);
         _connectorScopedContext.FilterOptions.ColumnFilters.Should().BeEquivalentTo(newColumnFilters);
     }
 
-    [TestMethod]
+    [Fact]
     public void ApplyFilter_WithNullValues_KeepsExistingFilters()
     {
+        // Arrange
         var originalStartDateTime = _connectorScopedContext.FilterOptions.StartDateTime;
         var originalEndDateTime = _connectorScopedContext.FilterOptions.EndDateTime;
         var originalColumnFilters = _connectorScopedContext.FilterOptions.ColumnFilters;
-
+        
+        // Act
         _connectorScopedContext.ApplyFilter();
-
+        
+        // Assert
         _connectorScopedContext.FilterOptions.StartDateTime.Should().Be(originalStartDateTime);
         _connectorScopedContext.FilterOptions.EndDateTime.Should().Be(originalEndDateTime);
         _connectorScopedContext.FilterOptions.ColumnFilters.Should().BeEquivalentTo(originalColumnFilters);
     }
 
 
-    [TestMethod]
+    [Fact]
     public async Task ReloadPackets_WhenNewPacketsFetched_AddsPackets()
     {
+        // Arrange
         var now = DateTime.Now;
         var packet1 = new PacketDto { Id = 1, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "A", DateCreated = now, Data = "Data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packet2 = new PacketDto { Id = 2, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "B", DateCreated = now, Data = "Data2", ParentId = null, Status = PacketStatus.Enqueued };
@@ -160,9 +173,11 @@ public class ConnectorScopedContextTests
 
         var raisedEvents = new List<(ConnectorIdentifier Identifier, ConnectorPacketsChangedDto Changed)>();
         _connectorScopedContext.OnConnectorPacketsChanged += (x, y) => raisedEvents.Add((x, y));
-
-        await _connectorScopedContext.ReloadPackets();
-
+        
+        // Act
+        await _connectorScopedContext.ReloadPackets(TestContext.Current.CancellationToken);
+        
+        // Assert
         // Packets contains both packets.
         _connectorScopedContext.Packets.Should().HaveCount(2);
         _connectorScopedContext.Packets.Should().Contain([packet1, packet2]);
@@ -180,9 +195,10 @@ public class ConnectorScopedContextTests
         raisedEvents.First().Changed.Should().Be(ConnectorPacketsChangedDto.Any);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ReloadPackets_WhenPacketsChanged_UpdatesPackets()
     {
+        // Arrange
         var now = DateTime.Now;
         var packet1 = new PacketDto { Id = 1, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "A", DateCreated = now, Data = "Data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packet2 = new PacketDto { Id = 2, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "B", DateCreated = now, Data = "Data2", ParentId = null, Status = PacketStatus.Enqueued };
@@ -200,10 +216,11 @@ public class ConnectorScopedContextTests
         var regToken = await _messenger.AnswerAsync<ConnectorPacketsFilterDto, PacketWrapperDto>(
             ConnectorContract.UIPacketsGetTopic(_connectorIdentifier),
             _ => initialWrapper);
-
+        
+        // Act
         // Trigger initial load
-        await _connectorScopedContext.ReloadPackets();
-
+        await _connectorScopedContext.ReloadPackets(TestContext.Current.CancellationToken);
+        
         // 5 packets loaded in their original groups
         _connectorScopedContext.Packets.Should().HaveCount(5);
         _connectorScopedContext.GroupedPackets.Should().ContainKey(new PacketGroupIdentifier(packet2.ConnectorName, "B"));
@@ -234,8 +251,9 @@ public class ConnectorScopedContextTests
                 _ => updatedWrapper);
 
         // Trigger update load
-        await _connectorScopedContext.ReloadPackets();
+        await _connectorScopedContext.ReloadPackets(TestContext.Current.CancellationToken);
 
+        // Assert
         // All 5 packets should be loaded
         // Packet2 and packet4 should be updated
         _connectorScopedContext.Packets.Should().HaveCount(5);
@@ -248,9 +266,10 @@ public class ConnectorScopedContextTests
         _connectorScopedContext.GroupedPackets[groupKey4].Single(p => p.Id == packet4.Id).Should().Be(updatedPacket4);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ReloadPackets_WhenPacketsChangedChannel_UpdatesPacketGroups()
     {
+        // Arrange
         var now = DateTime.Now;
         var packet1 = new PacketDto { Id = 1, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "A", DateCreated = now, Data = "Data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packet2 = new PacketDto { Id = 2, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "B", DateCreated = now, Data = "Data2", ParentId = null, Status = PacketStatus.Enqueued };
@@ -268,9 +287,10 @@ public class ConnectorScopedContextTests
         var regToken = await _messenger.AnswerAsync<ConnectorPacketsFilterDto, PacketWrapperDto>(
             ConnectorContract.UIPacketsGetTopic(_connectorIdentifier),
             _ => initialWrapper);
-
+        
+        // Act
         // Trigger initial load
-        await _connectorScopedContext.ReloadPackets();
+        await _connectorScopedContext.ReloadPackets(TestContext.Current.CancellationToken);
 
         // 5 packets loaded in their original groups
         _connectorScopedContext.Packets.Should().HaveCount(5);
@@ -304,8 +324,9 @@ public class ConnectorScopedContextTests
             _ => updatedWrapper);
 
         // Trigger update load
-        await _connectorScopedContext.ReloadPackets();
+        await _connectorScopedContext.ReloadPackets(TestContext.Current.CancellationToken);
 
+        // Assert
         // All 5 packets should be loaded
         // packet2 and packet4 should be updated
         _connectorScopedContext.Packets.Should().HaveCount(5);
@@ -323,9 +344,10 @@ public class ConnectorScopedContextTests
 
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ReloadPackets_WhenExistingPacketsNotFetched_DeletePackets()
     {
+        // Arrange
         var now = DateTime.Now;
         var packet1 = new PacketDto { Id = 1, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "A", DateCreated = now, Data = "Data1", ParentId = null, Status = PacketStatus.Enqueued };
         var packet2 = new PacketDto { Id = 2, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "B", DateCreated = now, Data = "Data2", ParentId = null, Status = PacketStatus.Enqueued };
@@ -343,9 +365,10 @@ public class ConnectorScopedContextTests
         var regToken = await _messenger.AnswerAsync<ConnectorPacketsFilterDto, PacketWrapperDto>(
             ConnectorContract.UIPacketsGetTopic(_connectorIdentifier),
             _ => initialWrapper);
-
+        
+        // Act
         // Trigger initial load
-        await _connectorScopedContext.ReloadPackets();
+        await _connectorScopedContext.ReloadPackets(TestContext.Current.CancellationToken);
 
         // 5 packets loaded
         _connectorScopedContext.Packets.Should().HaveCount(5);
@@ -363,8 +386,9 @@ public class ConnectorScopedContextTests
             ConnectorContract.UIPacketsGetTopic(_connectorIdentifier),
             _ => updatedWrapper);
 
-        await _connectorScopedContext.ReloadPackets();
+        await _connectorScopedContext.ReloadPackets(TestContext.Current.CancellationToken);
 
+        // Assert
         // Only 3 packets should remain
         _connectorScopedContext.Packets.Should().HaveCount(3);
         _connectorScopedContext.Packets.Should().Contain(p => p.Id == packet1.Id);
@@ -384,9 +408,10 @@ public class ConnectorScopedContextTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ReloadPackets_WithFilterHint_CombinesOldAndNewPackets()
     {
+        // Arrange
         var now = DateTime.Now;
         _connectorScopedContext.ApplyFilter(now.AddMinutes(-10), now.AddMinutes(5));
 
@@ -399,7 +424,8 @@ public class ConnectorScopedContextTests
             ConnectorContract.UIPacketsGetTopic(_connectorIdentifier),
             _ => initialWrapper);
 
-        await _connectorScopedContext.ReloadPackets();
+        // Act
+        await _connectorScopedContext.ReloadPackets(TestContext.Current.CancellationToken);
         await regToken.DisposeAsync();
 
         var packet3 = new PacketDto { Id = 3, ConnectorName = _connectorIdentifier.ConnectorKey, Channel = "B", DateCreated = now.AddMinutes(2), Data = "Data3", ParentId = null, Status = PacketStatus.Enqueued };
@@ -432,9 +458,10 @@ public class ConnectorScopedContextTests
         _connectorContext.OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(
             _connectorIdentifier, new ConnectorPacketsChangedDto(filterHint));
 
-        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
         await regToken.DisposeAsync();
-
+        
+        // Assert
         receivedFilter.Should().NotBeNull();
         receivedFilter.Should().Be(expectedFilter);
 
@@ -458,18 +485,22 @@ public class ConnectorScopedContextTests
         _connectorScopedContext.GroupedPackets[groupC].Should().ContainSingle(p => p.Id == packet4.Id);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartFilterRunner_RegistersListenersAndSendsCorrectRequest()
     {
+        // Arrange
         var eventTriggered = false;
 
         var start = new DateTime(2024, 1, 1);
         var end = new DateTime(2024, 12, 31);
         var columnFilters = new List<PacketColumnFilter>
-    {
-        new() { ColumnName = nameof(PacketDto.Channel), Operator = FilterOperator.String.Contains, Value = "Value1" },
-        new() { ColumnName = nameof(PacketDto.Id), Operator = FilterOperator.Number.GreaterThan, Value = "10" }
-    };
+        {
+            new()
+            {
+                ColumnName = nameof(PacketDto.Channel), Operator = FilterOperator.String.Contains, Value = "Value1"
+            },
+            new() { ColumnName = nameof(PacketDto.Id), Operator = FilterOperator.Number.GreaterThan, Value = "10" }
+        };
         _connectorScopedContext.ApplyFilter(start, end, columnFilters);
 
         FilterRunnerRequest? receivedRequest = null;
@@ -479,13 +510,16 @@ public class ConnectorScopedContextTests
 
         _connectorScopedContext.OnConnectorPacketsChanged += (_, _) => eventTriggered = true;
 
+        // Act
         await _connectorScopedContext.StartFilterRunner();
 
+        // Assert
         _connectorScopedContext.IsFilterRunning.Should().BeTrue();
         receivedRequest.Should().NotBeNull();
         receivedRequest.PacketRequestDto.DateTimeStart.Should().Be(start);
         receivedRequest.PacketRequestDto.DateTimeEnd.Should().Be(end);
-        receivedRequest.PacketRequestDto.ColumnFilters.Should().BeEquivalentTo(columnFilters.Select(x => x.ToColumnFilterDto()));
+        receivedRequest.PacketRequestDto.ColumnFilters.Should()
+            .BeEquivalentTo(columnFilters.Select(x => x.ToColumnFilterDto()));
 
         var responses = await _messenger.AskAsync<PacketWrapperDto, bool>(
             ConnectorContract.PushFilteredPacketsTopic(receivedRequest.FilterRunnerIdentifier),
@@ -504,82 +538,103 @@ public class ConnectorScopedContextTests
         _connectorScopedContext.IsFilterRunning.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StopFilterRunner_WhenCalled_SendsFilterRunnerStopRequest()
     {
+        // Arrange
         string? receivedFilterRunnerIdentifier = null;
         await _messenger.ListenAsync<string>(
             ConnectorContract.StopFilterRunnerTopic(_connectorIdentifier),
             x => receivedFilterRunnerIdentifier = x);
-
+        
+        // Act
         await _connectorScopedContext.StopFilterRunner();
-
+        
+        // Assert
         receivedFilterRunnerIdentifier.Should().NotBeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ResendPacketsAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         var packets = new HashSet<PacketDto>
         {
             new() { Id = 1, Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued },
             new() { Id = 2, Channel = "Test", DateCreated = DateTime.Now, Data = "data2", ParentId = null, Status = PacketStatus.Enqueued }
         };
-
+        
+        // Act
         await _connectorScopedContext.ResendPacketsAsync(packets);
+        
+        // Assert
         await _connectorContext.Received(1).ResendPacketsAsync(packets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StopPacketsAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         var packets = new HashSet<PacketDto>
         {
             new() { Id = 1, Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued },
             new() { Id = 2, Channel = "Test", DateCreated = DateTime.Now, Data = "data2", ParentId = null, Status = PacketStatus.Enqueued }
         };
-
+        
+        // Act
         await _connectorScopedContext.StopPacketsAsync(packets);
+        
+        // Assert
         await _connectorContext.Received(1).StopPacketsAsync(packets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task DeletePacketsAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         var packets = new HashSet<PacketDto>
         {
             new() { Id = 1, Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued },
             new() { Id = 2, Channel = "Test", DateCreated = DateTime.Now, Data = "data2", ParentId = null, Status = PacketStatus.Enqueued }
         };
-
+        
+        // Act
         await _connectorScopedContext.DeletePacketsAsync(packets);
+        
+        // Assert
         await _connectorContext.Received(1).DeletePacketsAsync(packets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ImportPacketsAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         var importData = new ConnectorPacketsExportDto([]);
         _connectorContext.ImportPacketsAsync(importData, true).Returns(true);
-
+        
+        // Act
         var result = await _connectorScopedContext.ImportPacketsAsync(importData, true);
-
+        
+        // Assert
         result.Should().BeTrue();
         await _connectorContext.Received(1).ImportPacketsAsync(importData, true);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RunAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         var cancellationToken = CancellationToken.None;
+        
+        // Act
         await _connectorScopedContext.RunAsync(cancellationToken);
+        
+        // Assert
         await _connectorContext.Received(1).RunAsync(cancellationToken);
     }
 
-    [TestCleanup]
-    public async Task TestCleanup()
+    public async ValueTask DisposeAsync()
     {
         await _connectorScopedContext.DisposeAsync();
     }
 }
-

@@ -8,47 +8,40 @@ using eHub.UI.Services;
 using eHub.UI.State;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MudBlazor;
 using NSubstitute;
 
 namespace eHub.UI.Tests.State;
 
-[TestClass]
 public class CombinedConnectorScopedContextTests
 {
-    private ConnectorIdentifier _connectorIdentifier = default!;
-    private IConnectorContext _connectorContext = default!;
-    private IConnectorRegistry _connectorRegistry = default!;
-    private IConnectorScopedContextProvider _scopedContextProvider = default!;
-    private Dictionary<string, IConnectorScopedContext> _connectorScopes = [];
+    private readonly ConnectorIdentifier _connectorIdentifier = new("instance", "Combined");
+    private readonly IConnectorContext _connectorContext = Substitute.For<IConnectorContext>();
+    private readonly IConnectorRegistry _connectorRegistry = Substitute.For<IConnectorRegistry>();
+    private readonly IConnectorScopedContextProvider _scopedContextProvider = Substitute.For<IConnectorScopedContextProvider>();
+    private readonly Dictionary<string, IConnectorScopedContext> _connectorScopes = [];
 
     private CombinedConnectorScopedContext? _combinedScopedContext;
     private UIViewConfig? _uIViewConfig;
 
-    [TestInitialize]
-    public void TestInitialize()
-    {
-        _connectorIdentifier = new ConnectorIdentifier("instance", "Combined");
-        _connectorContext = Substitute.For<IConnectorContext>();
-        _connectorRegistry = Substitute.For<IConnectorRegistry>();
-        _scopedContextProvider = Substitute.For<IConnectorScopedContextProvider>();
-    }
-
-    [TestMethod]
+    [Fact]
     public void GetUIViewConfig_WhenCalled_ReturnsExpectedConfig()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
         _connectorContext.GetUIViewConfig().Returns(_uIViewConfig);
-
+        
+        // Act
         var result = _combinedScopedContext.GetUIViewConfig();
-
+        
+        // Assert
         result.Should().Be(_uIViewConfig);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetCustomFilters_ReturnsExpectedFilters()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
         var customFilters = new Dictionary<string, Type>
@@ -59,15 +52,18 @@ public class CombinedConnectorScopedContextTests
         }.AsReadOnly();
 
         _connectorContext.GetCustomFilters().Returns(customFilters);
-
+        
+        // Act
         var result = _combinedScopedContext.GetCustomFilters();
-
+        
+        // Assert
         result.Should().BeSameAs(customFilters);
     }
 
-    [TestMethod]
+    [Fact]
     public void ApplyFilter_WithNewValues_CallsAllScopedContexts()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
         var newStartDateTime = new DateTime(2024, 1, 1);
@@ -77,9 +73,11 @@ public class CombinedConnectorScopedContextTests
             new() { ColumnName = nameof(PacketDto.Channel), Operator = FilterOperator.String.Contains, Value = "Value1" },
             new() { ColumnName = nameof(PacketDto.Id), Operator = FilterOperator.Number.GreaterThan, Value = "10" },
         };
-
+        
+        // Act
         _combinedScopedContext.ApplyFilter(newStartDateTime, newEndDateTime, newColumnFilters);
-
+        
+        // Assert
         _combinedScopedContext.FilterOptions.StartDateTime.Should().Be(newStartDateTime);
         _combinedScopedContext.FilterOptions.EndDateTime.Should().Be(newEndDateTime);
         _combinedScopedContext.FilterOptions.ColumnFilters.Should().BeEquivalentTo(newColumnFilters);
@@ -90,13 +88,16 @@ public class CombinedConnectorScopedContextTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartFilterRunner_WhenCalled_CallsAllScopedContexts()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
-
+        
+        // Act
         await _combinedScopedContext.StartFilterRunner();
-
+        
+        // Assert
         foreach (var scopedContext in _connectorScopes.Values)
         {
             await scopedContext.Received(1).StartFilterRunner();
@@ -105,13 +106,16 @@ public class CombinedConnectorScopedContextTests
         _combinedScopedContext.IsFilterRunning.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StopFilterRunner_WhenCalled_CallsAllScopedContexts()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
-
+        
+        // Act
         await _combinedScopedContext.StopFilterRunner();
-
+        
+        // Assert
         foreach (var scopedContext in _connectorScopes.Values)
         {
             await scopedContext.Received(1).StopFilterRunner();
@@ -120,62 +124,75 @@ public class CombinedConnectorScopedContextTests
         _combinedScopedContext.IsFilterRunning.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RunAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
+        // Act
         var cancellationToken = CancellationToken.None;
         await _combinedScopedContext.RunAsync(cancellationToken);
-
+        
+        // Assert
         await _connectorContext.Received(1).RunAsync(cancellationToken);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task DeletePacketsAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
         var packet1 = new PacketDto { Id = 1, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, ParentId = null, Status = PacketStatus.Enqueued };
         var packet2 = new PacketDto { Id = 1, ConnectorName = "ConnectorB", Channel = "Test", DateCreated = DateTime.Now, ParentId = null, Status = PacketStatus.Enqueued };
         var packets = new HashSet<PacketDto> { packet1, packet2 };
-
+        
+        // Act
         await _combinedScopedContext.DeletePacketsAsync(packets);
-
+        
+        // Assert
         await _connectorContext.Received(1).DeletePacketsAsync(packets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ResendPacketsAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
         var packet1 = new PacketDto { Id = 1, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, ParentId = null, Status = PacketStatus.Enqueued };
         var packet2 = new PacketDto { Id = 1, ConnectorName = "ConnectorB", Channel = "Test", DateCreated = DateTime.Now, ParentId = null, Status = PacketStatus.Enqueued };
         var packets = new HashSet<PacketDto> { packet1, packet2 };
-
+        
+        // Act
         await _combinedScopedContext.ResendPacketsAsync(packets);
-
+        
+        // Assert
         await _connectorContext.Received(1).ResendPacketsAsync(packets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StopPacketsAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
         var packet1 = new PacketDto {Id = 1, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, ParentId = null, Status = PacketStatus.Enqueued };
         var packet2 = new PacketDto {Id = 1, ConnectorName = "ConnectorB", Channel = "Test", DateCreated = DateTime.Now, ParentId = null, Status = PacketStatus.Enqueued };
         var packets = new HashSet<PacketDto> { packet1, packet2 };
-
+        
+        // Act
         await _combinedScopedContext.StopPacketsAsync(packets);
-
+        
+        // Assert
         await _connectorContext.Received(1).StopPacketsAsync(packets);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ImportPacketsAsync_WhenCalled_CallsConnectorContext()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
         var packet1 = new PacketDto { Id = 1, ConnectorName = "ConnectorA", Channel = "Test", DateCreated = DateTime.Now, ParentId = null, Status = PacketStatus.Enqueued };
@@ -184,16 +201,18 @@ public class CombinedConnectorScopedContextTests
         var importData = new ConnectorPacketsExportDto([.. packets]);
 
         _connectorContext.ImportPacketsAsync(importData, true).Returns(true);
-
+        
+        // Act
         var result = await _combinedScopedContext.ImportPacketsAsync(importData, true);
-
+        
         result.Should().BeTrue();
         await _connectorContext.Received(1).ImportPacketsAsync(importData, true);
     }
 
-    [TestMethod]
+    [Fact]
     public void ConnectorPacketsChangedHandler_WhenCalled_WhenNewPacketsFetched_AddsPackets()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
         var now = DateTime.Now;
@@ -205,9 +224,11 @@ public class CombinedConnectorScopedContextTests
         _connectorScopes["ConnectorA"].Packets.Returns(packetsA);
         _connectorScopes["ConnectorB"].Packets.Returns(packetsB);
 
+        // Act
         _connectorScopes["ConnectorA"].OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(new ConnectorIdentifier("instance", "ConnectorA"), ConnectorPacketsChangedDto.Any);
         _connectorScopes["ConnectorB"].OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(new ConnectorIdentifier("instance", "ConnectorB"), ConnectorPacketsChangedDto.Any);
-
+        
+        // Assert
         _combinedScopedContext.Packets.Should().HaveCount(2);
 
         var groupKey1 = new PacketGroupIdentifier(packet1.ConnectorName, packet1.Channel);
@@ -218,9 +239,10 @@ public class CombinedConnectorScopedContextTests
         _combinedScopedContext.GroupedPackets[groupKey2].Should().Contain(packet2);
     }
 
-    [TestMethod]
+    [Fact]
     public void ConnectorPacketsChangedHandler_WhenPacketsChangedChannel_UpdatesPacketGroups()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
         var now = DateTime.Now;
@@ -236,9 +258,10 @@ public class CombinedConnectorScopedContextTests
         _connectorScopes["ConnectorA"].Packets.Returns(packetsA);
         _connectorScopes["ConnectorB"].Packets.Returns(packetsB);
 
+        // Act
         _connectorScopes["ConnectorA"].OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(new ConnectorIdentifier("instance", "ConnectorA"), ConnectorPacketsChangedDto.Any);
         _connectorScopes["ConnectorB"].OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(new ConnectorIdentifier("instance", "ConnectorB"), ConnectorPacketsChangedDto.Any);
-
+        
         _combinedScopedContext.Packets.Should().HaveCount(5);
         _combinedScopedContext.GroupedPackets.Should().ContainKey(new PacketGroupIdentifier(packet2.ConnectorName, "B"));
         _combinedScopedContext.GroupedPackets.Should().ContainKey(new PacketGroupIdentifier(packet4.ConnectorName, "D"));
@@ -262,6 +285,7 @@ public class CombinedConnectorScopedContextTests
         _connectorScopes["ConnectorA"].OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(new ConnectorIdentifier("instance", "ConnectorA"), ConnectorPacketsChangedDto.Any);
         _connectorScopes["ConnectorB"].OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(new ConnectorIdentifier("instance", "ConnectorB"), ConnectorPacketsChangedDto.Any);
 
+        // Assert
         _combinedScopedContext.Packets.Should().HaveCount(5);
         _combinedScopedContext.Packets.Should().Contain(p => p.ConnectorName == updatedPacket2.ConnectorName && p.Id == updatedPacket2.Id && p.Channel == updatedPacket2.Channel);
         _combinedScopedContext.Packets.Should().Contain(p => p.ConnectorName == updatedPacket4.ConnectorName && p.Id == updatedPacket4.Id && p.Channel == updatedPacket4.Channel);
@@ -280,9 +304,10 @@ public class CombinedConnectorScopedContextTests
         _combinedScopedContext.GroupedPackets[oldGroupKey4].Should().NotContain(p => p.Id == packet4.Id);
     }
 
-    [TestMethod]
+    [Fact]
     public void ConnectorPacketsChangedHandler_WhenExistingPacketsNotFetched_DeletePackets()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
 
         var now = DateTime.Now;
@@ -298,9 +323,11 @@ public class CombinedConnectorScopedContextTests
         _connectorScopes["ConnectorA"].Packets.Returns(packetsA);
         _connectorScopes["ConnectorB"].Packets.Returns(packetsB);
 
+        // Act
         _connectorScopes["ConnectorA"].OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(new ConnectorIdentifier("instance", "ConnectorA"), ConnectorPacketsChangedDto.Any);
         _connectorScopes["ConnectorB"].OnConnectorPacketsChanged += Raise.Event<OnConnectorPacketsChangedDelegate>(new ConnectorIdentifier("instance", "ConnectorB"), ConnectorPacketsChangedDto.Any);
-
+        
+        // Assert
         _combinedScopedContext.Packets.Should().HaveCount(5);
 
         packetsA.Remove(packet2);
@@ -327,13 +354,16 @@ public class CombinedConnectorScopedContextTests
         _combinedScopedContext.GroupedPackets[groupKey5].Should().Contain(p => p.Id == packet5.Id);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task DisposeAsync_WhenCalled_DisposesAllScopedContexts()
     {
+        // Arrange
         InitializeCombinedConnectorScopedContext(["ConnectorA", "ConnectorB"]);
-
+        
+        // Act
         await _combinedScopedContext.DisposeAsync();
-
+        
+        // Assert
         await _connectorScopes["ConnectorA"].Received(1).DisposeAsync();
         await _connectorScopes["ConnectorA"].Received(1).DisposeAsync();
     }

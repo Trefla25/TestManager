@@ -5,101 +5,121 @@ using System.Text.Json;
 
 namespace eHub.Tests;
 
-[TestClass]
-public class StringValuesJsonConverterTests
+public class StringValuesJsonConverterTests 
 {
-    private JsonSerializerOptions _options = default!;
+    private readonly JsonSerializerOptions _options;
 
-    [TestInitialize]
-    public void Setup()
+    public StringValuesJsonConverterTests()
     {
         _options = new JsonSerializerOptions();
         _options.Converters.Add(new StringValuesDictionaryJsonConverter());
     }
 
-    [TestMethod]
+    [Fact]
     public void Deserialize_InvalidValue_ThrowsJsonException()
     {
-        var json = "{\"badKey\": 123}";
-
+        // Arrange
+        const string json = "{\"badKey\": 123}";
+        
+        // Act
         Action act = () => JsonSerializer.Deserialize<Dictionary<string, StringValues>>(json, _options);
-
+        
+        // Assert
         act.Should().Throw<JsonException>();
     }
 
-    [TestMethod]
+    [Fact]
     public void Deserialize_EmptyPropertyName_ThrowsJsonException()
     {
-        var json = "{\"\":\"value\"}";
-
+        // Arrange
+        const string json = "{\"\":\"value\"}";
+        
+        // Act
         Action act = () => JsonSerializer.Deserialize<Dictionary<string, StringValues>>(json, _options);
-
+        
+        // Assert
         act.Should().Throw<JsonException>().WithMessage("PropertyName token should not be null or empty.*");
     }
 
-    [TestMethod]
+    [Fact]
     public void Deserialize_EmptyArray_ReturnsEmptyStringValues()
     {
-        var json = "{\"empty\": []}";
-
+        // Arrange
+        const string json = "{\"empty\": []}";
+        
+        // Act
         var result = JsonSerializer.Deserialize<Dictionary<string, StringValues>>(json, _options);
-
+        
+        // Assert
         result.Should().ContainKey("empty");
         result["empty"].ToArray().Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public void Deserialize_SingleStringValue_ReturnsSingleItem()
     {
-        var json = "{\"key\":\"value123\"}";
-
+        // Arrange
+        const string json = "{\"key\":\"value123\"}";
+        
+        // Act
         var result = JsonSerializer.Deserialize<Dictionary<string, StringValues>>(json, _options);
-
+        
+        // Assert
         result.Should().ContainKey("key");
         result["key"].Count.Should().Be(1);
         result["key"][0].Should().Be("value123");
     }
 
-    [TestMethod]
+    [Fact]
     public void Deserialize_StringArray_ReturnsAllItems()
     {
-        var json = "{\"key\":[\"a\",\"b\",\"c\"]}";
-
+        // Arrange
+        const string json = "{\"key\":[\"a\",\"b\",\"c\"]}";
+        
+        // Act
         var result = JsonSerializer.Deserialize<Dictionary<string, StringValues>>(json, _options);
-
+        
+        // Assert
         result.Should().ContainKey("key");
         result["key"].Should().BeEquivalentTo(["a", "b", "c"]);
     }
 
-    [TestMethod]
+    [Fact]
     public void Serialize_SingleValue_WritesJsonString()
     {
+        // Arrange
         var dict = new Dictionary<string, StringValues>
         {
             ["foo"] = new StringValues("only-one")
         };
-
+        
+        // Act
         var json = JsonSerializer.Serialize(dict, _options);
-
+        
+        // Assert
         json.Should().Be("{\"foo\":\"only-one\"}");
     }
 
-    [TestMethod]
+    [Fact]
     public void Serialize_MultipleValues_WritesJsonArray()
     {
+        // Arrange
         var dict = new Dictionary<string, StringValues>
         {
             ["bar"] = new StringValues(["x", "y", "z"])
         };
-
+        
+        // Act
         var json = JsonSerializer.Serialize(dict, _options);
-
+        
+        // Assert
         json.Should().Be("{\"bar\":[\"x\",\"y\",\"z\"]}");
     }
 
-    [TestMethod]
+    [Fact]
     public void RoundTrip_FromDictionary_SerializesAndDeserializesCorrectly()
     {
+        // Arrange
         var original = new Dictionary<string, StringValues>
         {
             ["one"] = new StringValues("1"),
@@ -107,9 +127,11 @@ public class StringValuesJsonConverterTests
             ["empty"] = new StringValues([])
         };
 
+        // Act
         var json = JsonSerializer.Serialize(original, _options);
         var result = JsonSerializer.Deserialize<Dictionary<string, StringValues>>(json, _options);
-
+        
+        // Assert
         result.Should().HaveCount(3);
         result["one"].Should().BeEquivalentTo(["1"]);
         result["many"].Should().BeEquivalentTo(["a", "b"]);

@@ -7,21 +7,16 @@ using eHub.UI.State;
 using eMessenger;
 using eMessenger.Tests;
 using FluentAssertions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NSubstitute;
 
 namespace eHub.UI.Tests.State;
 
-[TestClass]
 public class ConnectorContextTests
 {
-    private ConnectorContext _connectorContext = default!;
-    private ConnectorIdentifier _connectorIdentifier = default!;
-    private ConnectorUiData _connectorUiData = default!;
-    private IMessenger _messenger = default!;
-
-    [TestInitialize]
-    public void TestInitialize()
+    private readonly ConnectorContext _connectorContext;
+    private readonly ConnectorIdentifier _connectorIdentifier;
+    private readonly ConnectorUiData _connectorUiData;
+    private readonly IMessenger _messenger;
+    public ConnectorContextTests()
     {
         _connectorIdentifier = new ConnectorIdentifier(Guid.NewGuid().ToString(), "TestConnector");
         _connectorUiData = new ConnectorUiData("TestConnector", "TestConnector", new UIViewConfig());
@@ -29,9 +24,10 @@ public class ConnectorContextTests
         _connectorContext = new ConnectorContext(_connectorIdentifier, _connectorUiData, _messenger);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RunAsync_WhenCalled_RegistersListener()
     {
+        // Act
         await _connectorContext.RunAsync(CancellationToken.None);
 
         var raisedEvents = new List<(ConnectorIdentifier Identifier, ConnectorPacketsChangedDto Changed)>();
@@ -39,33 +35,40 @@ public class ConnectorContextTests
 
         var expectedChangedDto = new ConnectorPacketsChangedDto(new(DateTime.Now.AddDays(-1), DateTime.Now));
         await _messenger.SendAsync(ConnectorContract.PacketsChangedTopic(_connectorIdentifier), expectedChangedDto);
-
+        
+        // Assert
         raisedEvents.Should().ContainSingle();
         raisedEvents.First().Identifier.Should().Be(_connectorIdentifier);
         raisedEvents.First().Changed.FilterHint.Should().Be(expectedChangedDto.FilterHint);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ConnectorPacketsChangedHandler_WhenNoSubscribers_DoesNotThrow()
     {
+        // Arrange
         await _connectorContext.RunAsync(CancellationToken.None);
-
+        
+        // Act
         var act = async () => await _messenger.SendAsync(ConnectorContract.PacketsChangedTopic(_connectorIdentifier), new ConnectorPacketsChangedDto(new()));
-
+        
+        // Assert
         await act.Should().NotThrowAsync();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetUIViewConfig_WhenCalled_ReturnsExpectedConfig()
     {
+        // Act
         var result = _connectorContext.GetUIViewConfig();
-
+        
+        // Assert
         result.Should().Be(_connectorUiData.UIViewConfig);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetCustomFilters_WithValidFilters_ReturnsExpectedFilters()
     {
+        // Arrange
         var customFilters = new Dictionary<string, string>
         {
             { "Filter1", typeof(int).ToString() },
@@ -78,8 +81,11 @@ public class ConnectorContextTests
             () => customFilters);
 
         await _connectorContext.RunAsync(CancellationToken.None);
+        
+        // Act
         var result = _connectorContext.GetCustomFilters();
-
+        
+        // Assert
         result.Should().NotBeNull();
         result.Should().HaveCount(3);
         result.Should().ContainKey("Filter1");
@@ -91,19 +97,24 @@ public class ConnectorContextTests
         result["Filter3"].Should().Be<DateTime>();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task GetCustomFilters_WhenNoListener_ReturnsEmpty()
     {
+        // Arrange
         await _connectorContext.RunAsync(CancellationToken.None);
+        
+        // Act
         var result = _connectorContext.GetCustomFilters();
-
+        
+        // Assert
         result.Should().NotBeNull();
         result.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StopPacketsAsync_WhenCalled_SendsCorrectRequest()
     {
+        // Arrange
         var packets = new HashSet<PacketDto>
         {
             new() { Id = 1, Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued },
@@ -114,16 +125,19 @@ public class ConnectorContextTests
         await _messenger.ListenAsync<ImmutableArray<long>>(
             ConnectorContract.PacketManualStopSequenceTopic(_connectorIdentifier),
             x => receivedPacketIds = x);
-
+        
+        // Act
         await _connectorContext.StopPacketsAsync(packets);
-
+        
+        // Assert
         receivedPacketIds.Should().NotBeNull();
         receivedPacketIds.Should().BeEquivalentTo(new long[] { 1, 2 });
     }
 
-    [TestMethod]
+    [Fact]
     public async Task DeletePacketsAsync_WhenCalled_SendsCorrectRequest()
     {
+        // Arrange
         var packets = new HashSet<PacketDto>
         {
             new() { Id = 1, Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued },
@@ -134,16 +148,19 @@ public class ConnectorContextTests
         await _messenger.ListenAsync<ImmutableArray<long>>(
             ConnectorContract.PacketDeleteSequenceTopic(_connectorIdentifier),
             x => receivedPacketIds = x);
-
+        
+        // Act
         await _connectorContext.DeletePacketsAsync(packets);
-
+        
+        // Assert
         receivedPacketIds.Should().NotBeNull();
         receivedPacketIds.Should().BeEquivalentTo(new long[] { 1, 2 });
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ResendPacketsAsync_WhenCalled_SendsCorrectRequest()
     {
+        // Arrange
         var packets = new HashSet<PacketDto>
         {
             new() { Id = 1, Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued },
@@ -155,17 +172,19 @@ public class ConnectorContextTests
             ConnectorContract.PacketResendTopic(_connectorIdentifier),
             x => receivedPacketDtos = x);
 
+        // Act
         await _connectorContext.ResendPacketsAsync(packets);
-
         var packetResendDtos = packets.Select(packet => new PacketResendDto(packet.Id, packet.Data)).ToImmutableArray();
-
+        
+        // Assert
         receivedPacketDtos.Should().NotBeNull();
         receivedPacketDtos.Should().BeEquivalentTo(packetResendDtos);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ImportPacketsAsync_WhenCalled_SendsCorrectRequestAndReturnsExpectedResult()
     {
+        // Arrange
         var packets = new HashSet<PacketDto>
         {
             new() { Id = 1, Channel = "Test", DateCreated = DateTime.Now, Data = "data1", ParentId = null, Status = PacketStatus.Enqueued },
@@ -178,9 +197,11 @@ public class ConnectorContextTests
         await _messenger.AnswerAsync<ConnectorPacketsTryImportDto, bool>(
             ConnectorContract.PacketTryImportTopic(_connectorIdentifier),
             x => { receivedImportDto = x; return true; });
-
+        
+        // Act
         var result = await _connectorContext.ImportPacketsAsync(importData, true);
-
+        
+        // Assert
         result.Should().BeTrue();
         receivedImportDto.Should().NotBeNull();
         receivedImportDto.Export.Should().BeEquivalentTo(importData);

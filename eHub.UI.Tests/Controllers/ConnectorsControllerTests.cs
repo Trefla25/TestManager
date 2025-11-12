@@ -7,30 +7,28 @@ using eMessenger;
 using eMessenger.Tests;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace eHub.UI.Tests.Controllers;
 
-[TestClass]
 public class ConnectorsControllerTests
 {
-    private IMessenger _messenger = default!;
-    private ConnectorsController _controller = default!;
+    private readonly IMessenger _messenger;
+    private readonly ConnectorsController _controller;
 
-    [TestInitialize]
-    public void Setup()
+    public ConnectorsControllerTests()
     {
         _messenger = TestingMessenger.CreateScoped();
         _controller = new ConnectorsController(_messenger);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task DownloadPacketsAsJson_WhenPacketsExist_ReturnsJsonFile()
     {
+        // Arrange
         var connectorIdentifier = new ConnectorIdentifier("TestConnector", "TestConnector");
         var filter = new PacketRequestDto();
         var filterJson = JsonSerializer.Serialize(filter);
-        var title = "testExport";
+        const string title = "testExport";
 
         var expectedResponse = new ConnectorPacketsExportDto([
             new PacketDto { Id = 1, ConnectorName = "TestConnector1", Channel = "A", DateCreated = DateTime.Now, Data = "Data1", ParentId = null, Status = PacketStatus.Enqueued },
@@ -41,9 +39,11 @@ public class ConnectorsControllerTests
             ConnectorContract.PacketExportTopic(connectorIdentifier),
             _ => expectedResponse
         );
-
+        
+        // Act
         var result = await _controller.DownloadPacketsAsJson(connectorIdentifier, filterJson, title);
-
+        
+        // Assert
         result.Should().BeOfType<FileContentResult>();
         var fileResult = (FileContentResult)result;
         fileResult.ContentType.Should().Be("application/json");
@@ -58,21 +58,23 @@ public class ConnectorsControllerTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task DownloadPacketsAsJson_WhenNoPacketsExist_ReturnsNoContent()
     {
+        // Arrange
         var connectorIdentifier = new ConnectorIdentifier("TestConnector", "TestConnector");
         var filterJson = JsonSerializer.Serialize(new PacketRequestDto());
-        var title = "testExport";
+        const string title = "testExport";
 
         await _messenger.AnswerAsync<PacketRequestDto, ConnectorPacketsExportDto>(
             ConnectorContract.PacketExportTopic(connectorIdentifier),
             _ => null!
         );
-
+        
+        // Act
         var result = await _controller.DownloadPacketsAsJson(connectorIdentifier, filterJson, title);
-
+        
+        // Assert
         result.Should().BeOfType<NoContentResult>();
     }
 }
-

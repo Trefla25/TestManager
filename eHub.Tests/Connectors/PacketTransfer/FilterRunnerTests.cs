@@ -18,27 +18,25 @@ using NSubstitute;
 
 namespace eHub.Tests.Connectors.PacketTransfer;
 
-[TestClass]
-public class FilterRunnerTests
+public class FilterRunnerTests : IAsyncLifetime
 {
     private const int RunnerStopTimeout = 500;
-    private FilterRunner _filterRunner = default!;
-    private string _filterRunnerId = default!;
-    private ConnectorMetadata _metadata = default!;
-    private ConnectorTemplate _connectorTemplate = default!;
-    private PacketDtoService _packetDtoService = default!;
-    private ILoggerFactory _loggerFactory = default!;
-    private IPacketTransfer _packetTransfer = default!;
-    private IPacketConverter _packetConverter = default!;
-    private IScopedMessenger _messenger = default!;
-    private SqliteConnection _connection = default!;
-    private IDbContextFactory<HubDbContext> _dbContextFactory = default!;
-    private CancellationTokenSource _cancellationTokenSource = default!;
-    private IRegistrationToken _registrationToken = default!;
+    private FilterRunner _filterRunner = null!;
+    private string _filterRunnerId = null!;
+    private ConnectorMetadata _metadata = null!;
+    private ConnectorTemplate _connectorTemplate = null!;
+    private PacketDtoService _packetDtoService = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private IPacketTransfer _packetTransfer = null!;
+    private IPacketConverter _packetConverter = null!;
+    private IScopedMessenger _messenger = null!;
+    private SqliteConnection _connection = null!;
+    private IDbContextFactory<HubDbContext> _dbContextFactory = null!;
+    private CancellationTokenSource _cancellationTokenSource = null!;
+    private IRegistrationToken _registrationToken = null!;
 
 
-    [TestInitialize]
-    public async Task TestInitialize()
+    public async ValueTask InitializeAsync()
     {
         _connection = new SqliteConnection(DbHelper.InMemoryConnectionString);
         await _connection.OpenAsync();
@@ -76,10 +74,11 @@ public class FilterRunnerTests
         await context.Database.EnsureCreatedAsync();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WithValidFilter_StartsRunner()
     {
-        _registrationToken = await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (x) => true);
+        // Arrange
+        _registrationToken = await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (_) => true);
 
         var startDate = DateTime.Now.AddMinutes(-1);
         var endDate = DateTime.Now;
@@ -92,18 +91,21 @@ public class FilterRunnerTests
             DateTimeEnd = endDate,
             Limit = 5
         };
-
+        
+        // Act
         await _filterRunner.StartAsync(filter, _cancellationTokenSource.Token);
-
+        
+        // Assert
         _filterRunner.IsRunning.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WhenAlreadyRunning_RestartsRunner()
     {
+        // Arrange
         var stopped = false;
-        _registrationToken += await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (x) => true);
-        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (x) => stopped = true);
+        _registrationToken += await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (_) => true);
+        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (_) => stopped = true);
 
         var startDate = DateTime.Now.AddMinutes(-1);
         var endDate = DateTime.Now;
@@ -117,19 +119,22 @@ public class FilterRunnerTests
             Limit = 5
         };
 
+        // Act
         await _filterRunner.StartAsync(filter, _cancellationTokenSource.Token);
         await _filterRunner.StartAsync(filter, _cancellationTokenSource.Token);
-
+        
+        // Assert
         stopped.Should().BeTrue();
         _filterRunner.IsRunning.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WhenCancelled_StopsRunnerAndNotifies()
     {
+        // Arrange
         var stopped = false;
-        _registrationToken += await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (x) => true);
-        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (x) => stopped = true);
+        _registrationToken += await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (_) => true);
+        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (_) => stopped = true);
 
         var startDate = DateTime.Now.AddMinutes(-1);
         var endDate = DateTime.Now;
@@ -143,22 +148,25 @@ public class FilterRunnerTests
             Limit = 5
         };
 
+        // Act
         await _filterRunner.StartAsync(filter, _cancellationTokenSource.Token);
         await _cancellationTokenSource.CancelAsync();
-
+        
         // Make sure the runner has stopped.
         await WaitForRunnerToStopAsync(RunnerStopTimeout);
-
+        
+        // Assert
         _filterRunner.IsRunning.Should().BeFalse();
         stopped.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StopAsync_WhenRunning_StopsRunnerAndNotifies()
     {
+        // Arrange
         var stopped = false;
-        _registrationToken += await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (x) => true);
-        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (x) => stopped = true);
+        _registrationToken += await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (_) => true);
+        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (_) => stopped = true);
 
         var startDate = DateTime.Now.AddMinutes(-1);
         var endDate = DateTime.Now;
@@ -172,33 +180,39 @@ public class FilterRunnerTests
             Limit = 5
         };
 
+        // Act
         await _filterRunner.StartAsync(filter, _cancellationTokenSource.Token);
         await _filterRunner.StopAsync(_cancellationTokenSource.Token);
-
+        
         // Make sure the runner has stopped.
         await WaitForRunnerToStopAsync(RunnerStopTimeout);
-
+        
+        // Assert
         _filterRunner.IsRunning.Should().BeFalse();
         stopped.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StopAsync_WhenNotRunning_DoesNotNotify()
     {
+        // Arrange
         var stopped = false;
-        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (x) => stopped = true);
+        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (_) => stopped = true);
 
+        // Act
         await _filterRunner.StopAsync(_cancellationTokenSource.Token);
-
+        
         // Make sure the runner has stopped.
         await WaitForRunnerToStopAsync(RunnerStopTimeout);
-
+        
+        // Assert
         stopped.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RunAsync_WhenAllPacketsFiltered_ExitsLoopAndNotifies()
     {
+        // Arrange
         var receivedPacketIds = new HashSet<long>();
         _registrationToken += await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (x) =>
         {
@@ -207,7 +221,7 @@ public class FilterRunnerTests
         });
 
         var stopped = false;
-        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (x) => stopped = true);
+        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (_) => stopped = true);
 
         var startDate = DateTime.Now.AddMinutes(-10);
         var endDate = DateTime.Now.AddMinutes(10);
@@ -224,20 +238,23 @@ public class FilterRunnerTests
             Limit = 5
         };
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
-        var filteredPackets = await context.Packet.Where(p => p.DateCreated >= filterStartDate && p.DateCreated <= filterEndDate).ToArrayAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
+        var filteredPackets = await context.Packet.Where(p => p.DateCreated >= filterStartDate && p.DateCreated <= filterEndDate).ToArrayAsync(_cancellationTokenSource.Token);
         var expectedPacketsIds = filteredPackets.Select(p => p.Id).ToHashSet();
-
+        
+        // Act
         await _filterRunner.RunAsync(filter, _cancellationTokenSource.Token);
-
+        
+        // Assert
         _filterRunner.IsRunning.Should().BeFalse();
         stopped.Should().BeTrue();
         receivedPacketIds.Should().BeEquivalentTo(expectedPacketsIds);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RunAsync_WhenPacketsLeftAfterLoopEnds_SendsRemainingPackets()
     {
+        // Arrange
         var receivedPacketIds = new HashSet<long>();
         var batchesSent = 0;
 
@@ -249,7 +266,7 @@ public class FilterRunnerTests
         });
 
         var stopped = false;
-        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (x) => stopped = true);
+        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (_) => stopped = true);
 
         var startDate = DateTime.Now.AddMinutes(-10);
         var endDate = DateTime.Now.AddMinutes(10);
@@ -266,28 +283,33 @@ public class FilterRunnerTests
             Limit = 5
         };
 
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
-        var filteredPackets = await context.Packet.Where(p => p.DateCreated >= filterStartDate && p.DateCreated <= filterEndDate).ToArrayAsync();
+        await using var context = await _dbContextFactory.CreateDbContextAsync(_cancellationTokenSource.Token);
+        var filteredPackets = await context.Packet.Where(p => p.DateCreated >= filterStartDate && p.DateCreated <= filterEndDate)
+            .ToArrayAsync(_cancellationTokenSource.Token);
+        
         var expectedPacketsIds = filteredPackets.Select(p => p.Id).ToHashSet();
 
         // The filter runner will send batches of 5 packets of 16 total.
         // This means there will be 3 full batches and 1 partial batch (4 total).
-        var expectedBatchCount = 4;
-
+        const int expectedBatchCount = 4;
+        
+        // Act
         await _filterRunner.RunAsync(filter, _cancellationTokenSource.Token);
-
+        
+        // Assert
         _filterRunner.IsRunning.Should().BeFalse();
         stopped.Should().BeTrue();
         receivedPacketIds.Should().BeEquivalentTo(expectedPacketsIds);
         batchesSent.Should().Be(expectedBatchCount);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RunAsync_WhenCancelled_ExitsLoopAndNotifies()
     {
+        // Arrange
         var stopped = false;
-        _registrationToken += await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (x) => true);
-        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (x) => stopped = true);
+        _registrationToken += await _messenger.AnswerAsync<PacketWrapperDto, bool>(ConnectorContract.PushFilteredPacketsTopic(_filterRunnerId), (_) => true);
+        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (_) => stopped = true);
 
         var startDate = DateTime.Now.AddMinutes(-1);
         var endDate = DateTime.Now;
@@ -301,21 +323,24 @@ public class FilterRunnerTests
             Limit = 5
         };
 
+        // Act
         var runnerTask = _filterRunner.RunAsync(filter, _cancellationTokenSource.Token);
         await _cancellationTokenSource.CancelAsync();
-
+        
         // Make sure the runner has stopped.
         await WaitForTaskToCompleteAsync(runnerTask, RunnerStopTimeout);
-
+        
+        // Assert
         runnerTask.IsCompleted.Should().BeTrue();
         stopped.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RunAsync_WhenNoAcknowledge_ExitsLoopAndNotifies()
     {
+        // Arrange
         var stopped = false;
-        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (x) => stopped = true);
+        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (_) => stopped = true);
 
         var startDate = DateTime.Now.AddMinutes(-1);
         var endDate = DateTime.Now;
@@ -329,20 +354,23 @@ public class FilterRunnerTests
             Limit = 5
         };
 
+        // Act
         var runnerTask = _filterRunner.RunAsync(filter, _cancellationTokenSource.Token);
-
+        
         // Make sure the runner has stopped.
         await WaitForTaskToCompleteAsync(runnerTask, RunnerStopTimeout);
-
+        
+        // Assert
         runnerTask.IsCompleted.Should().BeTrue();
         stopped.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RunAsync_WhenNoPacketsQueried_ExitsLoopAndNotifies()
     {
+        // Arrange
         var stopped = false;
-        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (x) => stopped = true);
+        _registrationToken += await _messenger.ListenAsync<ConnectorIdentifier>(ConnectorContract.FilterRunnerStoppedNotification(_filterRunnerId), (_) => stopped = true);
 
         var startDate = DateTime.Now.AddMinutes(-1);
         var endDate = DateTime.Now;
@@ -353,21 +381,27 @@ public class FilterRunnerTests
             Limit = 5
         };
 
+        // Act
         var runnerTask = _filterRunner.RunAsync(filter, _cancellationTokenSource.Token);
-
+        
         // Make sure the runner has stopped.
         await WaitForTaskToCompleteAsync(runnerTask, RunnerStopTimeout);
-
+        
+        // Assert
         runnerTask.IsCompleted.Should().BeTrue();
         stopped.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void RunAsync_CalledWithCancelledToken_ExitsImmediately()
     {
+        // Arrange
         var cancelledToken = new CancellationToken(true);
+        
+        // Act
         var runnerTask = _filterRunner.RunAsync(new PacketRequestDto(), cancelledToken);
-
+        
+        // Assert
         runnerTask.IsCompleted.Should().BeTrue();
     }
 
@@ -377,7 +411,7 @@ public class FilterRunnerTests
         var random = new Random();
 
         // Get all values of the PacketStatus enum.
-        var statuses = Enum.GetValues<PacketStatus>().Cast<PacketStatus>().ToArray();
+        var statuses = Enum.GetValues<PacketStatus>();
 
         // Calculate the interval between packets.
         var totalDuration = endDate - startDate;
@@ -418,8 +452,7 @@ public class FilterRunnerTests
         }
     }
 
-    [TestCleanup]
-    public async Task TestCleanup()
+    public async ValueTask DisposeAsync()
     {
         await _cancellationTokenSource.CancelAsync();
         _cancellationTokenSource.Dispose();

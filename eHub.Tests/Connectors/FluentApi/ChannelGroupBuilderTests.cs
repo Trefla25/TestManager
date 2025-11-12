@@ -5,112 +5,139 @@ using FluentAssertions;
 
 namespace eHub.Tests.Connectors.FluentApi;
 
-[TestClass]
 public class ChannelGroupBuilderTests
 {
     private readonly ChannelGroupBuilder _builder = new();
 
-    [TestMethod]
+    [Fact]
     public void AddChannel_WithValidChannel_AddsChannel()
     {
+        // Arrange
         _builder.AddChannel("channel1");
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.Channels.Should().Contain("channel1");
     }
 
-    [TestMethod]
+    [Fact]
     public void AddChannel_WithMultipleChannels_AddsChannels()
     {
+        // Arrange
         _builder.AddChannel("ch1");
         _builder.AddChannel("ch2")
             .AddChannel("ch3");
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.Channels.Should().BeEquivalentTo(["ch1", "ch2", "ch3"]);
     }
 
-    [TestMethod]
+    [Fact]
     public void AddPacketRetentionRule_WithValidInput_AddsRetentionRule()
     {
+        // Arrange
         _builder.AddPacketRetentionRule(PacketStatus.Error, TimeSpan.FromMinutes(5));
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
-        config.PacketRetention.Should().ContainKey(PacketStatus.Error.ToString());
+        config.PacketRetention.Should().ContainKey(nameof(PacketStatus.Error));
 
-        var timeSpan = TimeSpan.Parse(config.PacketRetention[PacketStatus.Error.ToString()]);
+        var timeSpan = TimeSpan.Parse(config.PacketRetention[nameof(PacketStatus.Error)]);
         timeSpan.Should().Be(TimeSpan.FromMinutes(5));
     }
 
-    [TestMethod]
+    [Fact]
     public void DisableResend_WhenCalled_SetsCanResendFalse()
     {
+        // Arrange
         _builder.DisableResend();
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.CanResend.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void SetChannels_WithValidChannels_SetsChannels()
     {
+        // Arrange
         _builder.SetChannels(["ch1", "ch2"]);
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.Channels.Should().BeEquivalentTo(["ch1", "ch2"]);
     }
 
-    [TestMethod]
+    [Fact]
     public void SetChannels_WhenCalledMultipleTimes_KeepsLast()
     {
+        // Arrange
         _builder.SetChannels(["ch1", "ch2"]);
         _builder.SetChannels(["ch3", "ch4"]);
         _builder.SetChannels(["ch5", "ch6"]);
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.Channels.Should().BeEquivalentTo(["ch5", "ch6"]);
     }
 
-    [TestMethod]
+    [Fact]
     public void SetCleanerInterval_WithValidInterval_SetsCleanerInterval()
     {
+        // Arrange
         _builder.SetCleanerInterval(TimeSpan.FromSeconds(10));
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.CleanerInterval.Should().Be(TimeSpan.FromSeconds(10));
     }
 
-    [TestMethod]
+    [Fact]
     public void SetDbPollInterval_WithValidInterval_SetsDbPollInterval()
     {
+        // Arrange
         _builder.SetDbPollInterval(TimeSpan.FromSeconds(15));
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.DbPollInterval.Should().Be(TimeSpan.FromSeconds(15));
     }
 
-    [TestMethod]
+    [Fact]
     public void SetDefaultPacketRetention_WithValidRetention_SetsDefaultRetention()
     {
+        // Arrange
         _builder.SetDefaultPacketRetention(TimeSpan.FromMinutes(10));
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.PacketRetention.Should().ContainKey("Default");
 
@@ -118,55 +145,67 @@ public class ChannelGroupBuilderTests
         timeSpan.Should().Be(TimeSpan.FromMinutes(10));
     }
 
-    [TestMethod]
+    [Fact]
     public void SetPacketsPerCycle_WithValidCount_SetsPacketsPerCycle()
     {
+        // Arrange
         _builder.SetPacketsPerCycle(50);
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.PacketsPerCycle.Should().Be(50);
     }
 
-    [TestMethod]
+    [Fact]
     public void UseConcurrentProcessing_WhenCalled_SetsModeToConcurrent()
     {
+        // Arrange
         _builder.UseConcurrentProcessing();
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.Mode.Should().Be(ChannelMode.Concurrent);
     }
 
-    [TestMethod]
+    [Fact]
     public void UseSequentialProcessing_WhenCalled_SetsModeToSequential()
     {
+        // Arrange
         _builder.UseSequentialProcessing();
-
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.Mode.Should().Be(ChannelMode.Sequential);
     }
 
-    [TestMethod]
+    [Fact]
     public void Build_WithMultipleModes_KeepsLast()
     {
+        // Arrange
         _builder.UseSequentialProcessing();
         _builder.UseConcurrentProcessing();
-
+        
+        // Act
         var config = _builder.Build();
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.Mode.Should().Be(ChannelMode.Concurrent);
     }
 
-    [TestMethod]
+    [Fact]
     public void Build_WhenAllMethodsChained_ConfiguresAllProperties()
     {
+        // Arrange
         _builder
             .SetChannels(["ch1", "ch2"])
             .AddChannel("ch3")
@@ -178,14 +217,16 @@ public class ChannelGroupBuilderTests
             .SetPacketsPerCycle(50)
             .UseConcurrentProcessing();
 
+        // Act
         var config = _builder.Build();
 
-        var timeSpanError = TimeSpan.Parse(config.PacketRetention[PacketStatus.Error.ToString()]);
+        var timeSpanError = TimeSpan.Parse(config.PacketRetention[nameof(PacketStatus.Error)]);
         var timeSpanDefault = TimeSpan.Parse(config.PacketRetention["Default"]);
-
+        
+        // Assert
         config.Should().NotBeNull();
         config.Channels.Should().BeEquivalentTo(["ch1", "ch2", "ch3"]);
-        config.PacketRetention.Should().ContainKey(PacketStatus.Error.ToString());
+        config.PacketRetention.Should().ContainKey(nameof(PacketStatus.Error));
         config.CanResend.Should().BeFalse();
         config.CleanerInterval.Should().Be(TimeSpan.FromSeconds(10));
         config.DbPollInterval.Should().Be(TimeSpan.FromSeconds(15));

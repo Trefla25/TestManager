@@ -11,31 +11,27 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using MudBlazor;
 using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace eHub.UI.Tests.Services;
 
-[TestClass]
 public class HistoryStateUrlServiceTests
 {
-    private readonly string _baseAddress = "http://testdomain/eController/IntegrationHub/UI/Pages/History";
-    private ILogger<HistoryStateUrlService> _logger = default!;
-    private IConnectorRegistry _connectorRegistry = default!;
-    private HistoryStateUrlService _historyStateUrlService = default!;
-
-    [TestInitialize]
-    public void TestInitialize()
+    private const string BaseAddress = "http://testdomain/eController/IntegrationHub/UI/Pages/History";
+    private readonly IConnectorRegistry _connectorRegistry;
+    private readonly HistoryStateUrlService _historyStateUrlService;
+    
+    public HistoryStateUrlServiceTests()
     {
-        _logger = Substitute.For<ILogger<HistoryStateUrlService>>();
+        var logger = Substitute.For<ILogger<HistoryStateUrlService>>();
         _connectorRegistry = Substitute.For<IConnectorRegistry>();
-
-        _historyStateUrlService = new HistoryStateUrlService(_logger, _connectorRegistry);
+        _historyStateUrlService = new HistoryStateUrlService(logger, _connectorRegistry);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithValidConnector_ParsesValue()
     {
-        string url = _baseAddress + "?connector=MyConnector";
+        // Arrange
+        const string url = BaseAddress + "?connector=MyConnector";
 
         var connectorIdentifier = new ConnectorIdentifier("Instance", "MyConnector");
         var otherIdentifier = new ConnectorIdentifier("Instance", "OtherConnector");
@@ -45,16 +41,19 @@ public class HistoryStateUrlServiceTests
             { connectorIdentifier, new ConnectorUiData(connectorIdentifier.ConnectorKey, "MyConnectorType", new UIViewConfig()) },
             { otherIdentifier, new ConnectorUiData(otherIdentifier.ConnectorKey, "MyConnectorType", new UIViewConfig()) }
         });
-
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.Connector.Should().Be(connectorIdentifier);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithInvalidConnector_ReturnsNull()
     {
-        string url = _baseAddress + "?connector=InvalidConnector";
+        // Arrange
+        const string url = BaseAddress + "?connector=InvalidConnector";
 
         var connectorIdentifier = new ConnectorIdentifier("Instance", "MyConnector");
         var otherIdentifier = new ConnectorIdentifier("Instance", "OtherConnector");
@@ -64,160 +63,205 @@ public class HistoryStateUrlServiceTests
             { connectorIdentifier, new ConnectorUiData(connectorIdentifier.ConnectorKey, "MyConnectorType", new UIViewConfig()) },
             { otherIdentifier, new ConnectorUiData(otherIdentifier.ConnectorKey, "MyConnectorType", new UIViewConfig()) }
         });
-
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
+        
+        // Assert
         state.Connector.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithValidViewIndex_ParsesValue()
     {
-        string url = _baseAddress + "?view=2";
-
+        // Arrange
+        const string url = BaseAddress + "?view=2";
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.View.Should().Be(2);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithInvalidViewIndex_ReturnsDefault()
     {
-        string url = _baseAddress + "?view=invalid";
-
+        // Arrange
+        const string url = BaseAddress + "?view=invalid";
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.View.Should().Be(0);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithValidLiveMode_ParsesValue()
     {
-        string url = _baseAddress + "?liveMode=false";
-
+        // Arrange
+        const string url = BaseAddress + "?liveMode=false";
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.LiveMode.Should().BeFalse();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithInvalidLiveMode_ReturnsDefault()
     {
-        string url = _baseAddress + "?liveMode=invalid";
-
+        // Arrange
+        const string url = BaseAddress + "?liveMode=invalid";
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.LiveMode.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithValidStartDate_ParsesValue()
     {
-        string url = _baseAddress + "?startDate=10-03-2026";
-        DateTime expectedStart = DateTime.ParseExact("10-03-2026", "dd-MM-yyyy", CultureInfo.InvariantCulture);
-
+        // Arrange
+        const string url = BaseAddress + "?startDate=10-03-2026";
+        var expectedStart = DateTime.ParseExact("10-03-2026", "dd-MM-yyyy", CultureInfo.InvariantCulture);
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.StartDateTime.Should().Be(expectedStart);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithInvalidStartDate_ReturnsNull()
     {
-        string url = _baseAddress + "?startDate=3/10/2026";
-
+        // Arrange
+        const string url = BaseAddress + "?startDate=3/10/2026";
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.StartDateTime.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithValidStartTime_ParsesValue()
     {
-        string url = _baseAddress + "?startDate=10-03-2026&startTime=10-11";
-        DateTime expectedStart = DateTime.ParseExact("10-03-2026 10:11", "dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture);
-
+        // Arrange
+        const string url = BaseAddress + "?startDate=10-03-2026&startTime=10-11";
+        var expectedStart = DateTime.ParseExact("10-03-2026 10:11", "dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture);
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.StartDateTime.Should().Be(expectedStart);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithInvalidStartTime_ReturnsDefault()
     {
-        string url = _baseAddress + "?startDate=10-03-2026&startTime=00-99";
-        DateTime expectedStart = DateTime.ParseExact("10-03-2026", "dd-MM-yyyy", CultureInfo.InvariantCulture);
-
+        // Arrange
+        const string url = BaseAddress + "?startDate=10-03-2026&startTime=00-99";
+        var expectedStart = DateTime.ParseExact("10-03-2026", "dd-MM-yyyy", CultureInfo.InvariantCulture);
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.StartDateTime.Should().Be(expectedStart);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithValidEndDate_ParsesValue()
     {
-        string url = _baseAddress + "?endDate=11-03-2027";
-        DateTime expectedEnd = DateTime.ParseExact("11-03-2027", "dd-MM-yyyy", CultureInfo.InvariantCulture);
-
+        // Arrange
+        const string url = BaseAddress + "?endDate=11-03-2027";
+        var expectedEnd = DateTime.ParseExact("11-03-2027", "dd-MM-yyyy", CultureInfo.InvariantCulture);
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.EndDateTime.Should().Be(expectedEnd);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithInvalidEndDate_ReturnsNull()
     {
-        string url = _baseAddress + "?endDate=3/11/2027";
-
+        // Arrange
+        const string url = BaseAddress + "?endDate=3/11/2027";
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.EndDateTime.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithValidEndTime_ParsesValue()
     {
-        string url = _baseAddress + "?endDate=11-03-2027&endTime=11-12";
-        DateTime expectedEnd = DateTime.ParseExact("11-03-2027 11:12", "dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture);
-
+        // Arrange
+        const string url = BaseAddress + "?endDate=11-03-2027&endTime=11-12";
+        var expectedEnd = DateTime.ParseExact("11-03-2027 11:12", "dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture);
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.EndDateTime.Should().Be(expectedEnd);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithInvalidEndTime_ReturnsDefault()
     {
-        string url = _baseAddress + "?endDate=11-03-2027&endTime=00-99";
-        DateTime expectedEnd = DateTime.ParseExact("11-03-2027", "dd-MM-yyyy", CultureInfo.InvariantCulture);
-
+        // Arrange
+        const string url = BaseAddress + "?endDate=11-03-2027&endTime=00-99";
+        var expectedEnd = DateTime.ParseExact("11-03-2027", "dd-MM-yyyy", CultureInfo.InvariantCulture);
+        
+        // Act
         var state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Assert
         state.EndDateTime.Should().Be(expectedEnd);
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithValidColumnFilter_ParsesValue()
     {
-        string url = _baseAddress + "?column=Channel-contains-SomeChannel";
-
-        HistoryState state = _historyStateUrlService.GetStateFromUrl(url);
-
+        // Arrange
+        const string url = BaseAddress + "?column=Channel-contains-SomeChannel";
+        
+        // Act
+        var state = _historyStateUrlService.GetStateFromUrl(url);
+        
+        // Assert
         state.ColumnFilters.Should().NotBeEmpty();
         state.ColumnFilters[0].ColumnName.Should().Be(nameof(PacketDto.Channel));
         state.ColumnFilters[0].Operator.Should().Be(FilterOperator.String.Contains);
         state.ColumnFilters[0].Value.Should().Be("SomeChannel");
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithMultipleColumnFilters_ParsesValues()
     {
-        string url = _baseAddress +
+        // Arrange
+        const string url = BaseAddress +
             "?column=channel-contains-SomeChannel" +
             "&column=STATUS-is-Processed" +
             "&column=ParentId-%3E%3D-20";
-
-        HistoryState state = _historyStateUrlService.GetStateFromUrl(url);
-
+        
+        // Act
+        var state = _historyStateUrlService.GetStateFromUrl(url);
+        
+        // Assert
         state.ColumnFilters.Should().HaveCount(3);
 
         state.ColumnFilters[0].ColumnName.Should().Be(nameof(PacketDto.Channel));
@@ -226,43 +270,47 @@ public class HistoryStateUrlServiceTests
 
         state.ColumnFilters[1].ColumnName.Should().Be(nameof(PacketDto.Status));
         state.ColumnFilters[1].Operator.Should().Be(FilterOperator.Enum.Is);
-        state.ColumnFilters[1].Value.Should().Be(PacketStatus.Processed.ToString());
+        state.ColumnFilters[1].Value.Should().Be(nameof(PacketStatus.Processed));
 
         state.ColumnFilters[2].ColumnName.Should().Be(nameof(PacketDto.ParentId));
         state.ColumnFilters[2].Operator.Should().Be(FilterOperator.Number.GreaterThanOrEqual);
         state.ColumnFilters[2].Value.Should().Be("20");
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithInvalidColumnFilters_SkipsInvalid()
     {
-        string url = _baseAddress +
-                    "?column= " +
-                    "&column=invalid-format" +
-                    "&column=InvalidColumn-equals-data" +
-                    "&column=Id-contains-10" +
-                    "&column=Data-contains-valid";
-
-        HistoryState state = _historyStateUrlService.GetStateFromUrl(url);
-
+        // Arrange
+        const string url = BaseAddress +
+            "?column= " +
+            "&column=invalid-format" +
+            "&column=InvalidColumn-equals-data" +
+            "&column=Id-contains-10" +
+            "&column=Data-contains-valid";
+        
+        // Act
+        var state = _historyStateUrlService.GetStateFromUrl(url);
+        
+        // Assert
         state.ColumnFilters.Should().HaveCount(1);
         state.ColumnFilters[0].ColumnName.Should().Be(nameof(PacketDto.Data));
         state.ColumnFilters[0].Operator.Should().Be(FilterOperator.String.Contains);
         state.ColumnFilters[0].Value.Should().Be("valid");
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_WithAllParameters_ParsesAll()
     {
-        string url = _baseAddress +
-                     "?connector=MyConnector" +
-                     "&view=1" +
-                     "&liveMode=true" +
-                     "&startDate=10-03-2026" +
-                     "&startTime=10-11" +
-                     "&endDate=11-03-2026" +
-                     "&endTime=11-12" +
-                     "&column=Channel-contains-SomeChannel";
+        // Arrange
+        const string url = BaseAddress +
+            "?connector=MyConnector" +
+            "&view=1" +
+            "&liveMode=true" +
+            "&startDate=10-03-2026" +
+            "&startTime=10-11" +
+            "&endDate=11-03-2026" +
+            "&endTime=11-12" +
+            "&column=Channel-contains-SomeChannel";
 
         var connectorIdentifier = new ConnectorIdentifier("Instance", "MyConnector");
         var otherIdentifier = new ConnectorIdentifier("Instance", "OtherConnector");
@@ -273,11 +321,13 @@ public class HistoryStateUrlServiceTests
             { otherIdentifier, new ConnectorUiData("OtherConnector", "MyConnectorType", new UIViewConfig()) }
         });
        
-        HistoryState state = _historyStateUrlService.GetStateFromUrl(url);
+        // Act
+        var state = _historyStateUrlService.GetStateFromUrl(url);
 
-        DateTime expectedStart = DateTime.ParseExact("10-03-2026 10-11", "dd-MM-yyyy HH-mm", CultureInfo.InvariantCulture);
-        DateTime expectedEnd = DateTime.ParseExact("11-03-2026 11-12", "dd-MM-yyyy HH-mm", CultureInfo.InvariantCulture);
-
+        var expectedStart = DateTime.ParseExact("10-03-2026 10-11", "dd-MM-yyyy HH-mm", CultureInfo.InvariantCulture);
+        var expectedEnd = DateTime.ParseExact("11-03-2026 11-12", "dd-MM-yyyy HH-mm", CultureInfo.InvariantCulture);
+        
+        // Assert
         state.Connector.Should().Be(connectorIdentifier);
         state.View.Should().Be(1);
         state.LiveMode.Should().BeTrue();
@@ -289,9 +339,10 @@ public class HistoryStateUrlServiceTests
         state.ColumnFilters[0].Value.Should().Be("SomeChannel");
     }
 
-    [TestMethod]
+    [Fact]
     public void GetStateFromUrl_AllColumnOperators_ParsesAll()
     {
+        // Arrange
         var expectedCount = 0;
         var queryString = string.Empty;
         foreach (var column in PacketDto.PacketColumns)
@@ -308,65 +359,77 @@ public class HistoryStateUrlServiceTests
         }
 
         queryString = queryString.TrimStart('&');
-        string url = _baseAddress + '?' + queryString;
-
-        HistoryState state = _historyStateUrlService.GetStateFromUrl(url);
-
+        var url = BaseAddress + '?' + queryString;
+        
+        // Act
+        var state = _historyStateUrlService.GetStateFromUrl(url);
+        
+        // Assert
         state.ColumnFilters.Should().HaveCount(expectedCount);
     }
 
-    [TestMethod]
+    [Fact]
     public void AppendStateQuery_WithConnector_AppendsExpectedQuery()
     {
+        // Arrange
         var connector = new ConnectorIdentifier("Instance", "MyConnector");
         var state = new HistoryState
         {
             Connector = connector
         };
 
-        string resultUrl = HistoryStateUrlService.AppendStateQuery(_baseAddress, state);
+        // Act
+        var resultUrl = HistoryStateUrlService.AppendStateQuery(BaseAddress, state);
         var uri = new Uri(resultUrl);
         var queryParams = QueryHelpers.ParseQuery(uri.Query);
-
+        
+        // Assert
         queryParams.Keys.Should().Contain("Connector");
         queryParams["Connector"].ToString().Should().Be("MyConnector");
     }
 
-    [TestMethod]
+    [Fact]
     public void AppendStateQuery_WithView_AppendsExpectedQuery()
     {
+        // Arrange
         var state = new HistoryState
         {
             View = 3,
         };
 
-        string resultUrl = HistoryStateUrlService.AppendStateQuery(_baseAddress, state);
+        // Act
+        var resultUrl = HistoryStateUrlService.AppendStateQuery(BaseAddress, state);
         var uri = new Uri(resultUrl);
         var queryParams = QueryHelpers.ParseQuery(uri.Query);
-
+        
+        // Assert
         queryParams.Keys.Should().Contain("View");
         queryParams["View"].ToString().Should().Be("3");
     }
 
-    [TestMethod]
+    [Fact]
     public void AppendStateQuery_WithLiveMod_AppendsExpectedQuery()
     {
+        // Arrange
         var state = new HistoryState
         {
             LiveMode = false
         };
 
-        string resultUrl = HistoryStateUrlService.AppendStateQuery(_baseAddress, state);
+        // Act
+        var resultUrl = HistoryStateUrlService.AppendStateQuery(BaseAddress, state);
         var uri = new Uri(resultUrl);
         var queryParams = QueryHelpers.ParseQuery(uri.Query);
-
+        
+        // Assert
         queryParams.Keys.Should().Contain("LiveMode");
         queryParams["LiveMode"].ToString().Should().Be("False");
     }
 
-    [TestMethod]
+    [Fact]
     public void AppendStateQuery_WithStartDateTime_AppendsExpectedQuery()
     {
+        // Arrange
         var startDateTime = DateTime.Now;
         var expectedStartDate = startDateTime.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
         var expectedStartTime = startDateTime.ToString("HH-mm", CultureInfo.InvariantCulture);
@@ -376,39 +439,45 @@ public class HistoryStateUrlServiceTests
             StartDateTime = startDateTime,
         };
 
-        string resultUrl = HistoryStateUrlService.AppendStateQuery(_baseAddress, state);
+        // Act
+        var resultUrl = HistoryStateUrlService.AppendStateQuery(BaseAddress, state);
         var uri = new Uri(resultUrl);
         var queryParams = QueryHelpers.ParseQuery(uri.Query);
-
+        
+        // Assert
         queryParams.Keys.Should().Contain(["StartDate", "StartTime"]);
         queryParams["StartDate"].ToString().Should().Be(expectedStartDate);
         queryParams["StartTime"].ToString().Should().Be(expectedStartTime);
     }
 
-    [TestMethod]
+    [Fact]
     public void AppendStateQuery_WithEndDateTime_AppendsExpectedQuery()
     {
+        // Arrange
         var endDateTime = DateTime.Now;
         var expectedEndDate = endDateTime.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
         var expectedEndTime = endDateTime.ToString("HH-mm", CultureInfo.InvariantCulture);
 
+        // Act
         var state = new HistoryState
         {
             EndDateTime = endDateTime,
         };
 
-        string resultUrl = HistoryStateUrlService.AppendStateQuery(_baseAddress, state);
+        var resultUrl = HistoryStateUrlService.AppendStateQuery(BaseAddress, state);
         var uri = new Uri(resultUrl);
         var queryParams = QueryHelpers.ParseQuery(uri.Query);
-
+        
+        // Assert
         queryParams.Keys.Should().Contain(["EndDate", "EndTime"]);
         queryParams["EndDate"].ToString().Should().Be(expectedEndDate);
         queryParams["EndTime"].ToString().Should().Be(expectedEndTime);
     }
 
-    [TestMethod]
+    [Fact]
     public void AppendStateQuery_WithColumnFilters_AppendsExpectedQuery()
     {
+        // Arrange
         var state = new HistoryState
         {
             ColumnFilters =
@@ -434,10 +503,12 @@ public class HistoryStateUrlServiceTests
             ]
         };
 
-        string resultUrl = HistoryStateUrlService.AppendStateQuery(_baseAddress, state);
+        // Act
+        var resultUrl = HistoryStateUrlService.AppendStateQuery(BaseAddress, state);
         var uri = new Uri(resultUrl);
         var queryParams = QueryHelpers.ParseQuery(uri.Query);
-
+        
+        // Assert
         queryParams.Keys.Should().Contain("Column");
         var columnValues = queryParams["Column"];
         columnValues.Should().Contain($"{state.ColumnFilters[0].ColumnName}-{state.ColumnFilters[0].Operator}-{state.ColumnFilters[0].Value}");
@@ -445,27 +516,31 @@ public class HistoryStateUrlServiceTests
         columnValues.Should().Contain($"{state.ColumnFilters[2].ColumnName}-{state.ColumnFilters[2].Operator}-{state.ColumnFilters[2].Value}");
     }
 
-    [TestMethod]
+    [Fact]
     public void AppendStateQuery_WhenUrlHasQuery_ReplacesQuery()
     {
+        // Arrange
         var state = new HistoryState
         {
             Connector = new ConnectorIdentifier("Instance", "MyConnector")
         };
 
-        string urlWithQuery = _baseAddress + "?existingParam=existingValue";
-        string resultUrl = HistoryStateUrlService.AppendStateQuery(urlWithQuery, state);
+        // Act
+        const string urlWithQuery = BaseAddress + "?existingParam=existingValue";
+        var resultUrl = HistoryStateUrlService.AppendStateQuery(urlWithQuery, state);
         var uri = new Uri(resultUrl);
         var queryParams = QueryHelpers.ParseQuery(uri.Query);
-
+        
+        // Assert
         queryParams.Keys.Should().NotContain("existingParam");
         queryParams.Keys.Should().Contain("Connector");
         queryParams["Connector"].ToString().Should().Be("MyConnector");
     }
 
-    [TestMethod]
+    [Fact]
     public void AppendStateQuery_WithAllParameters_AppendsExpectedQuery()
     {
+        // Arrange
         var dateTimeStart = DateTime.Now;
         var dateTimeEnd = DateTime.Now.AddDays(1).AddHours(1);
 
@@ -493,16 +568,18 @@ public class HistoryStateUrlServiceTests
                 {
                     ColumnName = nameof(PacketDto.Status),
                     Operator = FilterOperator.Enum.Is,
-                    Value = PacketStatus.Processed.ToString()
+                    Value = nameof(PacketStatus.Processed)
                 }
             ]
         };
 
-        string resultUrl = HistoryStateUrlService.AppendStateQuery(_baseAddress, state);
+        // Act
+        var resultUrl = HistoryStateUrlService.AppendStateQuery(BaseAddress, state);
 
         var uri = new Uri(resultUrl);
         var queryParams = QueryHelpers.ParseQuery(uri.Query);
-
+        
+        // Assert
         queryParams.Should().ContainKey("Connector");
         queryParams["Connector"].Should().Contain("MyConnector");
 

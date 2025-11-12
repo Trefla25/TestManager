@@ -3,7 +3,7 @@ using eHub.Scripting.Connectors;
 
 namespace eHub.Tests.Helper;
 
-/// <summary>Testing utility to capture all events triggerd by a connector.</summary>
+/// <summary>Testing utility to capture all events triggered by a connector.</summary>
 internal class RecordingConnectorListener : IConnectorMessageHandler
 {
     public List<(string connectorName, IReadOnlyDictionary<string, string> statusDictionary)> Statuses { get; } = [];

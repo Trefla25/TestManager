@@ -4,113 +4,141 @@ using FluentAssertions;
 
 namespace eHub.Tests.Connectors.FluentApi;
 
-[TestClass]
 public class EndpointBuilderTests
 {
     private readonly EndpointBuilder _builder = new();
 
-    [TestMethod]
+    [Fact]
     public void AddAcceptedContentType_WithValidContentType_AddsContentType()
     {
+        // Arrange
         _builder.AddAcceptedContentType("application/json");
-
+        
+        // Act
         var endpointConfig = _builder.Build();
-
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
         endpointConfig.ContentTypes.Should().Contain("application/json");
     }
 
-    [TestMethod]
+    [Fact]
     public void RequireAuthorization_WithTrue_SetsAuthorize()
     {
+        // Arrange
         _builder.RequireAuthorization(true);
-
+        
+        // Act
         var endpointConfig = _builder.Build();
-
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
         endpointConfig.Authorize.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void SetHttpMethod_WithValidMethod_SetsHttpMethod()
     {
+        // Arrange
         _builder.SetHttpMethod("GET");
-
+        
+        // Act
         var endpointConfig = _builder.Build();
-
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
         endpointConfig.HttpMethod.Should().Be("GET");
     }
 
-    [TestMethod]
+    [Fact]
     public void SetPath_WithValidPath_SetsPath()
     {
+        // Arrange
         _builder.SetPath("/api/data");
-
+        
+        // Act
         var endpointConfig = _builder.Build();
-
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
         endpointConfig.Path.Should().Be("/api/data");
     }
 
-    [TestMethod]
+    [Fact]
     public void SetRequestSizeLimit_WithValidLimit_SetsRequestSizeLimit()
     {
+        // Arrange
         _builder.SetRequestSizeLimit(1024);
-
+        
+        // Act
         var endpointConfig = _builder.Build();
-
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
         endpointConfig.RequestSizeLimit.Should().Be(1024);
     }
 
-    [TestMethod]
+    [Fact]
     public void SetResendPacketsOnCommunicationError_WithTrue_SetsFlag()
     {
+        // Arrange
         _builder.EnableResendOnCommunicationError();
-
+        
+        // Act
         var endpointConfig = _builder.Build();
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
 
         endpointConfig.ResendPacketsOnCommunicationError.Should().BeTrue();
     }
 
-    [TestMethod]
+    [Fact]
     public void SetStoreMode_WithValidStoreMode_SetsStoreMode()
     {
+        // Arrange
         _builder.SetStoreMode(StoreMode.Persistent);
-
+        
+        // Act
         var endpointConfig = _builder.Build();
-
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
         endpointConfig.StoreMode.Should().Be(StoreMode.Persistent);
     }
 
-    [TestMethod]
+    [Fact]
     public void SetTopic_WithValidTopic_SetsTopic()
     {
+        // Arrange
         _builder.SetTopic("topic1");
-
+        
+        // Act
         var endpointConfig = _builder.Build();
-
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
         endpointConfig.Topic.Should().Be("topic1");
     }
 
-    [TestMethod]
+    [Fact]
     public void UseApi_WithValidApiName_SetsApiName()
     {
+        // Arrange
         _builder.UseApi("MyApi");
-
+        
+        // Act
         var endpointConfig = _builder.Build();
-
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
         endpointConfig.Api.Should().Be("MyApi");
     }
 
-    [TestMethod]
+    [Fact]
     public void Build_WhenAllMethodsChained_ConfiguresAllProperties()
     {
+        // Arrange
         _builder
             .AddAcceptedContentType("application/json")
             .RequireAuthorization(true)
@@ -121,9 +149,11 @@ public class EndpointBuilderTests
             .SetStoreMode(StoreMode.Persistent)
             .SetTopic("topic2")
             .UseApi("MyApi");
-
+        
+        // Act
         var endpointConfig = _builder.Build();
-
+        
+        // Assert
         endpointConfig.Should().NotBeNull();
         endpointConfig.ContentTypes.Should().Contain("application/json");
         endpointConfig.Authorize.Should().BeTrue();

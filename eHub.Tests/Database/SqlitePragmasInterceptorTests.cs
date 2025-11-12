@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using eHub.Database;
 using eHub.Tests.Helper;
 using FluentAssertions;
@@ -9,24 +10,22 @@ using NSubstitute;
 
 namespace eHub.Tests.Database;
 
-[TestClass]
-public class SqlitePragmasInterceptorTests
+public class SqlitePragmasInterceptorTests : IAsyncLifetime
 {
-    private ConnectionEndEventData _eventData = default!;
-    private TestEventDefinitionBase _eventDefinition = default!;
-    private SqliteConnection _connection = default!;
-    private HubDbContext _dbContext = default!;
+    private ConnectionEndEventData _eventData = null!;
+    private TestEventDefinitionBase _eventDefinition = null!;
+    private SqliteConnection _connection = null!;
+    private HubDbContext _dbContext = null!;
 
-    private readonly Func<EventDefinitionBase, EventData, string> _messageGenerator = (eventDef, eventData)
+    private readonly Func<EventDefinitionBase, EventData, string> _messageGenerator = (_, _)
         => "Test connection end event generated.";
 
-    [TestInitialize]
-    public async Task TestInitialize()
+    public async ValueTask InitializeAsync()
     {
         var loggerOptions = Substitute.For<ILoggingOptions>();
         var eventId = new EventId();
-        var level = LogLevel.Information;
-        var eventIdCode = "code";
+        const LogLevel level = LogLevel.Information;
+        const string eventIdCode = "code";
 
         _eventDefinition = new TestEventDefinitionBase(loggerOptions, eventId, level, eventIdCode);
         _connection = new SqliteConnection(DbHelper.InMemoryConnectionString);
@@ -44,62 +43,63 @@ public class SqlitePragmasInterceptorTests
            _messageGenerator,
            _connection,
            _dbContext,
-           new Guid(), true, DateTime.Now, TimeSpan.FromSeconds(1));
+           Guid.Empty, true, DateTime.Now, TimeSpan.FromSeconds(1));
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ConnectionOpenedAsync_WhenCalledWithValues_AppliesSqlitePragmas()
     {
+        // Arrange
         var pragmas = new Dictionary<string, string>
         {
             { "busy_timeout", "3000" },
             { "user_version", "123" }
         };
 
+        // Act
         var interceptor = new SqlitePragmasInterceptor(pragmas);
 
-        await interceptor.ConnectionOpenedAsync(_connection, _eventData);
+        await interceptor.ConnectionOpenedAsync(_connection, _eventData, TestContext.Current.CancellationToken);
 
         await using var cmd = _connection.CreateCommand();
 
         cmd.CommandText = "PRAGMA busy_timeout;";
-        var busyResult = await cmd.ExecuteScalarAsync();
+        var busyResult = await cmd.ExecuteScalarAsync(TestContext.Current.CancellationToken);
 
         cmd.CommandText = "PRAGMA user_version;";
-        var versionResult = await cmd.ExecuteScalarAsync();
-
+        var versionResult = await cmd.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+        // Assert
         busyResult.Should().Be(3000);
         versionResult.Should().Be(123);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ConnectionOpenedAsync_WhenCalledEmpty_DoesNotApplySqlitePragmas()
     {
-        var pragmas = new Dictionary<string, string>();
+        // Arrange
+        var pragmas = FrozenDictionary<string, string>.Empty;
         var interceptor = new SqlitePragmasInterceptor(pragmas);
 
-
-        await interceptor.ConnectionOpenedAsync(_connection, _eventData);
+        // Act
+        await interceptor.ConnectionOpenedAsync(_connection, _eventData, TestContext.Current.CancellationToken);
 
         await using var cmd = _connection.CreateCommand();
 
         cmd.CommandText = "PRAGMA busy_timeout;";
-        var busyResult = await cmd.ExecuteScalarAsync();
+        var busyResult = await cmd.ExecuteScalarAsync(TestContext.Current.CancellationToken);
 
         cmd.CommandText = "PRAGMA user_version;";
-        var versionResult = await cmd.ExecuteScalarAsync();
-
+        var versionResult = await cmd.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+        
+        // Assert
         busyResult.Should().Be(0);
         versionResult.Should().Be(0);
     }
 
-    [TestCleanup]
-    public async Task TestCleanup()
+    public async ValueTask DisposeAsync()
     {
         await _dbContext.DisposeAsync();
         await _connection.CloseAsync();
         await _connection.DisposeAsync();
     }
 }
-
-

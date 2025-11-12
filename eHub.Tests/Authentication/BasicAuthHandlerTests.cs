@@ -13,8 +13,7 @@ using System.Text.Encodings.Web;
 
 namespace eHub.Tests.Authentication;
 
-[TestClass]
-public class BasicAuthHandlerTests
+public class BasicAuthHandlerTests : IAsyncLifetime
 {
     private class BasicAuthenticationHandlerSpy(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -28,14 +27,13 @@ public class BasicAuthHandlerTests
         public Task<AuthenticateResult> InvokeAuthenticateAsync() => HandleAuthenticateAsync();
     }
 
-    private IOptionsMonitor<AuthenticationSchemeOptions> _options = default!;
-    private ILoggerFactory _loggerFactory = default!;
-    private UrlEncoder _encoder = default!;
-    private IUserService _userService = default!;
-    private BasicAuthenticationHandlerSpy _handlerSpy = default!;
+    private IOptionsMonitor<AuthenticationSchemeOptions> _options = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private UrlEncoder _encoder = null!;
+    private IUserService _userService = null!;
+    private BasicAuthenticationHandlerSpy _handlerSpy = null!;
 
-    [TestInitialize]
-    public async Task TestInitialize()
+    public async ValueTask InitializeAsync()
     {
         _options = Substitute.For<IOptionsMonitor<AuthenticationSchemeOptions>>();
         _loggerFactory = Substitute.For<ILoggerFactory>();
@@ -54,14 +52,17 @@ public class BasicAuthHandlerTests
         _handlerSpy = new BasicAuthenticationHandlerSpy(_options, _loggerFactory, _encoder, _userService);
         await _handlerSpy.InitializeAsync(scheme, httpContext);
     }
-
-    [TestMethod]
+    
+    [Fact]
     public async Task HandleAuthenticateAsync_NoAuthorizationHeader_Fails()
     {
+        // Arrange
         _handlerSpy.HttpContext.Request.Headers.Clear();
 
+        // Act
         var result = await _handlerSpy.InvokeAuthenticateAsync();
 
+        // Assert
         result.Succeeded.Should().BeFalse();
         result.Failure.Should().NotBeNull();
         result.None.Should().BeFalse();
@@ -72,13 +73,16 @@ public class BasicAuthHandlerTests
         wwwAuthenticate.Single().Should().Be("Basic");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task HandleAuthenticateAsync_WithInvalidSchemePrefix_Fails()
     {
+        // Arrange
         _handlerSpy.HttpContext.Request.Headers.Authorization = "Bearer xyz";
 
+        // Act
         var result = await _handlerSpy.InvokeAuthenticateAsync();
-
+        
+        // Assert
         result.Succeeded.Should().BeFalse();
         result.Failure.Should().NotBeNull();
         result.None.Should().BeFalse();
@@ -87,13 +91,16 @@ public class BasicAuthHandlerTests
         _handlerSpy.HttpContext.Response.Headers.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task HandleAuthenticateAsync_WithMalformedBase64_Fails()
     {
-        _handlerSpy.HttpContext.Request.Headers.Authorization = "Basic $$$notbase64$$$";
-
+        // Arrange
+        _handlerSpy.HttpContext.Request.Headers.Authorization = "Basic $$$notBase64$$$";
+        
+        // Act
         var result = await _handlerSpy.InvokeAuthenticateAsync();
-
+        
+        // Assert
         result.Succeeded.Should().BeFalse();
         result.Failure.Should().NotBeNull();
         result.None.Should().BeFalse();
@@ -102,14 +109,17 @@ public class BasicAuthHandlerTests
         _handlerSpy.HttpContext.Response.Headers.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task HandleAuthenticateAsync_OnlyUsername_Fails()
     {
+        // Arrange
         var token = Convert.ToBase64String(Encoding.UTF8.GetBytes("username"));
         _handlerSpy.HttpContext.Request.Headers.Authorization = $"Basic {token}";
 
+        // Act
         var result = await _handlerSpy.InvokeAuthenticateAsync();
 
+        // Assert
         result.Succeeded.Should().BeFalse();
         result.Failure.Should().NotBeNull();
         result.None.Should().BeFalse();
@@ -118,17 +128,19 @@ public class BasicAuthHandlerTests
         _handlerSpy.HttpContext.Response.Headers.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task HandleAuthenticateAsync_WithInvalidCredentials_Fails()
     {
-        // arrange: base64 of "bob:secret"
+        // Arrange
         var token = Convert.ToBase64String(Encoding.UTF8.GetBytes("username:password"));
         _handlerSpy.HttpContext.Request.Headers.Authorization = $"Basic {token}";
 
+        // Act
         _userService.Authenticate("username", "password").Returns(Task.FromResult<User?>(null));
 
         var result = await _handlerSpy.InvokeAuthenticateAsync();
 
+        // Assert
         await _userService.Received(1).Authenticate("username", "password");
         result.Succeeded.Should().BeFalse();
         result.Failure.Should().NotBeNull();
@@ -138,9 +150,10 @@ public class BasicAuthHandlerTests
         _handlerSpy.HttpContext.Response.Headers.Should().BeEmpty();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task HandleAuthenticateAsync_WithValidCredentials_ReturnsSuccess()
     {
+        // Arrange
         var token = Convert.ToBase64String(Encoding.UTF8.GetBytes("username:password"));
         _handlerSpy.HttpContext.Request.Headers.Authorization = $"Basic {token}";
 
@@ -154,9 +167,11 @@ public class BasicAuthHandlerTests
         };
 
         _userService.Authenticate("username", "password").Returns(Task.FromResult<User?>(fakeUser));
-
+        
+        // Act
         var result = await _handlerSpy.InvokeAuthenticateAsync();
 
+        // Assert
         result.Succeeded.Should().BeTrue();
         result.None.Should().BeFalse();
         result.Failure.Should().BeNull();
@@ -173,4 +188,7 @@ public class BasicAuthHandlerTests
         identifierClaim.Should().NotBeNull();
         identifierClaim.Value.Should().Be(fakeUser.Id.ToString());
     }
+    
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
 }

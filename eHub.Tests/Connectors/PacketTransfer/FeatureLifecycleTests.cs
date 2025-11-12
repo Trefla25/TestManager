@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Diagnostics.Metrics;
 using eHub.Config;
 using eHub.Contracts;
 using eHub.Contracts.UIConfig;
@@ -25,27 +24,25 @@ using NSubstitute.ExceptionExtensions;
 
 namespace eHub.Tests.Connectors.PacketTransfer;
 
-[TestClass]
-public class FeatureLifecycleTests
+public class FeatureLifecycleTests : IAsyncLifetime
 {
-    private PacketTransferFeature _packetTransferFeature = default!;
-    private SqliteConnection _connection = default!;
-    private ConnectorMetadata _metadata = default!;
-    private ConnectorTemplate _connectorTemplate = default!;
-    private PacketDtoService _packetDtoService = default!;
-    private PluginData _pluginData = default!;
-    private CancellationTokenSource _cancellationTokenSource = default!;
-    private IDbContextFactory<HubDbContext> _dbContextFactory = default!;
-    private ILoggerFactory _loggerFactory = default!;
-    private ILogger<PacketTransferFeature> _logger = default!;
-    private IScopedMessenger _messenger = default!;
-    private IPacketTransfer _packetTransfer = default!;
-    private IFilterRunnerProvider _filterRunnerProvider = default!;
-    private IEffortlessConfigurationRegistry _registry = default!;
-    private ConnectorMetrics _metrics = default!;
+    private PacketTransferFeature _packetTransferFeature = null!;
+    private SqliteConnection _connection = null!;
+    private ConnectorMetadata _metadata = null!;
+    private ConnectorTemplate _connectorTemplate = null!;
+    private PacketDtoService _packetDtoService = null!;
+    private PluginData _pluginData = null!;
+    private CancellationTokenSource _cancellationTokenSource = null!;
+    private IDbContextFactory<HubDbContext> _dbContextFactory = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private ILogger<PacketTransferFeature> _logger = null!;
+    private IScopedMessenger _messenger = null!;
+    private IPacketTransfer _packetTransfer = null!;
+    private IFilterRunnerProvider _filterRunnerProvider = null!;
+    private IEffortlessConfigurationRegistry _registry = null!;
+    private ConnectorMetrics _metrics = null!;
 
-    [TestInitialize]
-    public async Task Initialize()
+    public async ValueTask InitializeAsync()
     {
         _cancellationTokenSource = new();
         _connection = new SqliteConnection(DbHelper.InMemoryConnectionString);
@@ -73,14 +70,17 @@ public class FeatureLifecycleTests
         _packetDtoService = new PacketDtoService(NullLogger<PacketDtoService>.Instance, _packetTransfer, _metadata, _connectorTemplate);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WhenConnectorStarted_RegistersTopics()
     {
+        // Arrange
         _messenger = Substitute.For<IScopedMessenger>();
         _packetTransferFeature = new PacketTransferFeature(_logger, _dbContextFactory, _messenger, _packetTransfer, _filterRunnerProvider, _registry, _packetDtoService, _metadata, _connectorTemplate, _pluginData, _metrics);
-
+        
+        // Act
         await _packetTransferFeature.StartAsync(_cancellationTokenSource.Token);
-
+        
+        // Assert
         await _messenger.Received(1).AnswerAsync(
             Arg.Is(ConnectorContract.UIGetTopic(_metadata.ConnectorIdentifier)),
             Arg.Any<Func<ConnectorUiData>>());
@@ -126,9 +126,10 @@ public class FeatureLifecycleTests
             Arg.Any<Func<string, ValueTask>>());
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WhenConnectorStarted_SendsStartedNotification()
     {
+        // Arrange
         ConnectorStartedEventDto? startedDto = null;
 
         await _messenger.ListenAsync<ConnectorStartedEventDto>(ConnectorContract.ConnectorStartedTopic(), (result) =>
@@ -137,8 +138,11 @@ public class FeatureLifecycleTests
         });
 
         _packetTransferFeature = new PacketTransferFeature(_logger, _dbContextFactory, _messenger, _packetTransfer, _filterRunnerProvider, _registry, _packetDtoService, _metadata, _connectorTemplate, _pluginData, _metrics);
+        
+        // Act
         await _packetTransferFeature.StartAsync(_cancellationTokenSource.Token);
-
+        
+        // Assert
         startedDto.Should().NotBeNull();
         startedDto.Identifier.Should().Be(_metadata.ConnectorIdentifier);
         startedDto.Ui.ConnectorName.Should().Be(_metadata.TemplateName);
@@ -146,30 +150,34 @@ public class FeatureLifecycleTests
         startedDto.Ui.UIViewConfig.Should().NotBeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WhenCalledTwice_FailsSecond()
     {
+        // Arrange
         _packetTransferFeature = new PacketTransferFeature(_logger, _dbContextFactory, _messenger, _packetTransfer, _filterRunnerProvider, _registry, _packetDtoService, _metadata, _connectorTemplate, _pluginData, _metrics);
 
+        // Act
         await _packetTransferFeature.StartAsync(_cancellationTokenSource.Token);
-
         var act = async () => await _packetTransferFeature.StartAsync(_cancellationTokenSource.Token);
-
+        
+        // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Packet Transfer Feature already started*");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task StartAsync_WhenFails_DoesNotRegisterUITopics()
     {
+        // Arrange
         _messenger = Substitute.For<IScopedMessenger>();
 
         // Intentionally fail the connector initialization
         _dbContextFactory = Substitute.For<IDbContextFactory<HubDbContext>>();
-        _dbContextFactory.CreateDbContextAsync().Throws(new Exception("Expected Exception"));
+        _dbContextFactory.CreateDbContextAsync(Arg.Any<CancellationToken>()).ThrowsAsync(new Exception("Expected Exception"));
 
         _packetTransferFeature = new PacketTransferFeature(_logger, _dbContextFactory, _messenger, _packetTransfer, _filterRunnerProvider, _registry, _packetDtoService, _metadata, _connectorTemplate, _pluginData, _metrics);
 
+        // Act
         try
         {
             await _packetTransferFeature.StartAsync(_cancellationTokenSource.Token);
@@ -207,19 +215,19 @@ public class FeatureLifecycleTests
         await _messenger.DidNotReceive().AnswerAsync(
             Arg.Is(ConnectorContract.PacketTryImportTopic(_metadata.ConnectorIdentifier)),
             Arg.Any<Func<ConnectorPacketsTryImportDto, ValueTask<bool>>>());
-
         await _messenger.DidNotReceive().ListenAsync(
             Arg.Is(ConnectorContract.StartFilterRunnerTopic(_metadata.ConnectorIdentifier)),
             Arg.Any<Func<FilterRunnerRequest, ValueTask>>());
-
+        // Assert
         await _messenger.DidNotReceive().ListenAsync(
             Arg.Is(ConnectorContract.StopFilterRunnerTopic(_metadata.ConnectorIdentifier)),
             Arg.Any<Func<string, ValueTask>>());
     }
 
-    [TestMethod]
+    [Fact]
     public async Task DisposeAsync_WhenCalled_SendsStoppedNotification()
     {
+        // Arrange
         ConnectorStoppedEventDto? stoppedDto = null;
 
         await _messenger.ListenAsync<ConnectorStoppedEventDto>(ConnectorContract.ConnectorStoppedTopic(), (result) =>
@@ -228,15 +236,17 @@ public class FeatureLifecycleTests
         });
 
         _packetTransferFeature = new PacketTransferFeature(_logger, _dbContextFactory, _messenger, _packetTransfer, _filterRunnerProvider, _registry, _packetDtoService, _metadata, _connectorTemplate, _pluginData, _metrics);
+        
+        // Act
         await _packetTransferFeature.StartAsync(_cancellationTokenSource.Token);
         await _packetTransferFeature.DisposeAsync();
-
+        
+        // Assert
         stoppedDto.Should().NotBeNull();
         stoppedDto.Identifier.Should().Be(_metadata.ConnectorIdentifier);
     }
 
-    [TestCleanup]
-    public async Task Cleanup()
+    public async ValueTask DisposeAsync()
     {
         await _cancellationTokenSource.CancelAsync();
         _cancellationTokenSource.Dispose();

@@ -23,22 +23,20 @@ using NSubstitute;
 
 namespace eHub.Tests.Connectors.PacketTransfer.Db;
 
-[TestClass]
-public class PacketRepositoryTests
+public class PacketRepositoryTests : IAsyncLifetime
 {
     private static readonly PluginFiles EmptyPluginFiles = new(new NullFileProvider(), new NullFileProvider(), new NullFileProvider(), new NullFileProvider(), new NullFileProvider());
     private readonly PluginData _pluginData = new("DefaultTest", [], EmptyPluginFiles, NullLoggerFactory.Instance, AssemblyLoadContext.Default, NullPluginScopeDependencyResolver.Instance);
 
-    private AwaitablePacketsConnector _testConnector = default!;
-    private PacketTransferFeature _packetTransferCore = default!;
+    private AwaitablePacketsConnector _testConnector = null!;
+    private PacketTransferFeature _packetTransferCore = null!;
 
-    private SqliteConnection _connection = default!;
-    private IDbContextFactory<HubDbContext> _dbContextFactory = default!;
+    private SqliteConnection _connection = null!;
+    private IDbContextFactory<HubDbContext> _dbContextFactory = null!;
 
     private List<Packet> _packets = [];
 
-    [TestInitialize]
-    public async Task TestInitialize()
+    public async ValueTask InitializeAsync()
     {
         // We need at least one connection to the database to keep it alive
 
@@ -58,8 +56,7 @@ public class PacketRepositoryTests
             Type = "TestConnector",
             PacketTransfer = new()
             {
-                DbPath = _connection.DataSource,
-                ChannelGroups = { }
+                DbPath = _connection.DataSource
             }
         };
 
@@ -85,22 +82,26 @@ public class PacketRepositoryTests
         await db.Database.EnsureCreatedAsync();
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Create_SingleAdd_Success()
     {
+        // Arrange
         var samplePacket = new PacketData(Encoding.UTF8.GetBytes("SamplePacket"), "B", PacketStatus.InProgress, 12);
 
         var timeBefore = DateTime.Now;
 
-        await _testConnector.PacketRepository.Create().Add(samplePacket).CreateAsync();
+        // Act
+        await _testConnector.PacketRepository.Create().Add(samplePacket).CreateAsync(TestContext.Current.CancellationToken);
 
         var timeAfter = DateTime.Now;
 
         // Query the in-memory database
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        var packetsInDb = await dbContext.Packet.ToArrayAsync();
-
-        //Test that the data added in the Db correpsonds to the expectations
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        
+        var packetsInDb = await dbContext.Packet.ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
+        //Test that the data added in the Db corresponds to the expectations
         packetsInDb.Should().NotHaveCount(0, "The packet was not added in the Db");
 
         packetsInDb[0].Id.Should().NotBe(0, "Packet should not have Id equal to 0 after being added to the Db");
@@ -115,9 +116,10 @@ public class PacketRepositoryTests
         packetsInDb[0].DateChanged.Should().BeNull("Packet should have an empty DateChanged after being added to the Db");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Create_AddRange_Success()
     {
+        // Arrange
         var packets = new PacketData[]
         {
             new(Encoding.UTF8.GetBytes("Packet1"), "B", PacketStatus.InProgress, 12),
@@ -127,14 +129,17 @@ public class PacketRepositoryTests
 
         var timeBefore = DateTime.Now;
 
-        await _testConnector.PacketRepository.Create().AddRange(packets.AsEnumerable()).CreateAsync();
+        // Act
+        await _testConnector.PacketRepository.Create().AddRange(packets.AsEnumerable()).CreateAsync(TestContext.Current.CancellationToken);
 
         var timeAfter = DateTime.Now;
 
         // Query the in-memory database
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        var packetsInDb = await dbContext.Packet.ToArrayAsync();
-
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        
+        var packetsInDb = await dbContext.Packet.ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
+        
+        // Assert
         //Test that the packets were added as expected
         packetsInDb.Should().HaveCount(3, "The packets were not added correctly into the Db");
 
@@ -156,63 +161,72 @@ public class PacketRepositoryTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Query_NoPacketsWithCondition_NoResults()
     {
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.SaveChangesAsync();
-
+        // Arrange
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        
+        // Act
         var packetsInDb = await _testConnector.PacketRepository
             .Query()
             .Where(p => p.Id == 2)
-            .GetAsync();
-
+            .GetAsync(TestContext.Current.CancellationToken);
+        
+        // Assert
         packetsInDb.Should().BeEmpty("Query should have not returned anything");
 
         packetsInDb.Should().Equal([]);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Query_WithBadCondition_NoResults()
     {
+        // Arrange
         _packets =
         [
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet0"), Channel = "A", Status = PacketStatus.InProgress, ParentId = 12 },
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.FatalError, ParentId = 1 }
         ];
-
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddRangeAsync(_packets);
-        await dbContext.SaveChangesAsync();
-
+        
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddRangeAsync(_packets, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        
+        // Act
         var packetsInDb = await _testConnector.PacketRepository
                                    .Query()
                                    .Where(p => p.Channel == "C")
-                                   .GetAsync();
-
+                                   .GetAsync(TestContext.Current.CancellationToken);
+        
+        // Assert
         packetsInDb.Should().BeEmpty("The Db query should not return anything");
 
         packetsInDb.Should().Equal([]);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Query_WithCondition_SingleResult()
     {
+        // Arrange
         _packets =
         [
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet0"), Channel = "A", Status = PacketStatus.InProgress, ParentId = 12 },
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.FatalError, ParentId = 1 }
         ];
-
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddRangeAsync(_packets);
-        await dbContext.SaveChangesAsync();
-
+        
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddRangeAsync(_packets, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        
+        // Act
         var packetsInDb = await _testConnector.PacketRepository
                                    .Query()
                                    .Where(p => p.Channel == "A")
-                                   .GetAsync();
-
+                                   .GetAsync(TestContext.Current.CancellationToken);
+        
+        // Assert
         packetsInDb.Should().ContainSingle("The query did not return the expected number of packets");
 
         packetsInDb[0].Channel.Should().Be(_packets[0].Channel, "Packet Channel does not match after being added to the Db");
@@ -221,9 +235,10 @@ public class PacketRepositoryTests
         packetsInDb[0].ParentId.Should().Be(_packets[0].ParentId, "Packet ParentId doesn't match after being added to the Db");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Query_WithCondition_MultipleResults()
     {
+        // Arrange
         _packets =
         [
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet0"), Channel = "A", Status = PacketStatus.InProgress, ParentId = 12 },
@@ -231,17 +246,19 @@ public class PacketRepositoryTests
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet2"), Channel = "A", Status = PacketStatus.InProgress, ParentId = 123 },
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet3"), Channel = "B", Status = PacketStatus.Processed, ParentId = 33 }
         ];
-
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
+        
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         dbContext.Packet.AddRange(_packets);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
+        // Act
         var packetsInDb = await _testConnector.PacketRepository
                                    .Query()
                                    .Where(p => p.Channel == "A")
-                                   .GetAsync();
-
+                                   .GetAsync(TestContext.Current.CancellationToken);
         packetsInDb = [.. packetsInDb.OrderBy(p => p.Id)];
+        
+        // Assert
         packetsInDb.Should().HaveCount(3, "The query did not return the expected number of packets");
 
         for (var i = 0; i < packetsInDb.Length; i++)
@@ -256,27 +273,31 @@ public class PacketRepositoryTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Query_NoPackets_NoResults()
     {
+        // Arrange
         _packets = [];
-
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddRangeAsync(_packets);
-        await dbContext.SaveChangesAsync();
-
+        
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddRangeAsync(_packets, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        
+        // Act
         var packetsInDb = await _testConnector.PacketRepository
                                    .Query()
-                                   .GetAsync();
-
+                                   .GetAsync(TestContext.Current.CancellationToken);
+        
+        // Assert
         packetsInDb.Should().BeEmpty("Query should have not returned anything");
 
         packetsInDb.Should().Equal([]);
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Query_WithoutCondition_AllPacketsReturned()
     {
+        // Arrange
         _packets =
         [
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet0"), Channel = "B", Status = PacketStatus.InProgress, ParentId = 12 },
@@ -284,15 +305,17 @@ public class PacketRepositoryTests
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet2"), Channel = "C", Status = PacketStatus.Enqueued, ParentId = 123 },
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet3"), Channel = "A", Status = PacketStatus.Processed, ParentId = 33 }
         ];
-
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
+        
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         dbContext.Packet.AddRange(_packets);
-        await dbContext.SaveChangesAsync();
-
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        
+        // Act
         var packetsInDb = await _testConnector.PacketRepository
                                    .Query()
-                                   .GetAsync();
-
+                                   .GetAsync(TestContext.Current.CancellationToken);
+        
+        // Assert
         packetsInDb.Should().HaveCount(4, "Query did not return all packets from the Db");
 
         for (var i = 0; i < packetsInDb.Length; i++)
@@ -307,36 +330,38 @@ public class PacketRepositoryTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_Id_Success()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Processed, ParentId = 33 });
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.Id, 2)
             .Where(p => p.Id == 1)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 2)
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate.Should().NotBeNull("Packet id was not updated");
 
         packetsBeforeUpdate[0].BinaryData.SequenceEqual(packetsAfterUpdate[0].BinaryData).Should().BeTrue("Packets BinaryData before and after Update of Id does not match");
@@ -347,35 +372,38 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].DateCreated.Should().Be(packetsBeforeUpdate[0].DateCreated, "Packets DateCreated before and after Update of Id does not match");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_BinaryData_Fails()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "A", Status = PacketStatus.Processed, ParentId = 33 });
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
         dbContext.Packet.Add(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
-
+        
+        // Act
         var action = async () => await _testConnector.PacketRepository.Update()
                 .Set(p => p.BinaryData, Encoding.UTF8.GetBytes("Packet22"))
                 .Where(p => p.Id == 1)
                 .ExecuteAsync();
-
+        
+        // Assert
         await action.Should().ThrowAsync<InvalidOperationException>();
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
@@ -389,37 +417,39 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].BinaryData.SequenceEqual([.. Encoding.UTF8.GetBytes("Packet22")]).Should().BeFalse("Packet BinaryData should not have been updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_Metadata_Success()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Processed, ParentId = 33 });
         _packets[0].Metadata = "Before";
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
-
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
-        var x = await _testConnector.PacketRepository.Update()
+        // Act
+        await _testConnector.PacketRepository.Update()
             .Set(p => p.Metadata, "After")
             .Where(p => p.Id == 1)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate[0].Id.Should().Be(packetsBeforeUpdate[0].Id, "Packets Id before and after Update of Metadata does not match");
         packetsBeforeUpdate[0].BinaryData.SequenceEqual(packetsAfterUpdate[0].BinaryData).Should().BeTrue("Packets BinaryData before and after Update of Metadata does not match");
         packetsAfterUpdate[0].Channel.Should().Be(packetsBeforeUpdate[0].Channel, "Packets Channel before and after Update of Metadata does not match");
@@ -431,36 +461,38 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].Metadata.Should().Be("After", "Packet Metadata was not updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_Status_Success()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Enqueued, ParentId = 33 });
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.Status, PacketStatus.Processed)
             .Where(p => p.Id == 1)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate[0].Id.Should().Be(packetsBeforeUpdate[0].Id, "Packets Id before and after Update of Status does not match");
         packetsBeforeUpdate[0].BinaryData.SequenceEqual(packetsAfterUpdate[0].BinaryData).Should().BeTrue("Packets BinaryData before and after Update of Status does not match");
         packetsAfterUpdate[0].Channel.Should().Be(packetsBeforeUpdate[0].Channel, "Packets Channel before and after Update of Status does not match");
@@ -471,36 +503,38 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].Status.Should().Be(PacketStatus.Processed, "Packet Status was not updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_Channel_Success()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Processed, ParentId = 33 });
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.Channel, "A")
             .Where(p => p.Id == 1)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate[0].Id.Should().Be(packetsBeforeUpdate[0].Id, "Packet Id before and after Update of Channel does not match");
         packetsBeforeUpdate[0].BinaryData.SequenceEqual(packetsAfterUpdate[0].BinaryData).Should().BeTrue("Packet BinaryData before and after Update of Channel does not match");
         packetsAfterUpdate[0].Status.Should().Be(packetsBeforeUpdate[0].Status, "Packet Status before and after Update of Channel does not match");
@@ -511,37 +545,39 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].Channel.Should().Be("A", "Packet Channel was not updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_DynamicField_Success()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Processed, ParentId = 33 });
         _packets[0].DynamicField = "Before";
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.DynamicField, "After")
             .Where(p => p.Id == 1)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate[0].Id.Should().Be(packetsBeforeUpdate[0].Id, "Packets Id before and after Update of DynamicField does not match");
         packetsBeforeUpdate[0].BinaryData.SequenceEqual(packetsAfterUpdate[0].BinaryData).Should().BeTrue("Packets BinaryData before and after Update of DynamicField does not match");
         packetsAfterUpdate[0].Channel.Should().Be(packetsBeforeUpdate[0].Channel, "Packets Channel before and after Update of DynamicField does not match");
@@ -553,36 +589,38 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].DynamicField.Should().Be("After", "Packet DynamicField was not updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_ParentId_Success()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Processed, ParentId = 33 });
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
-        var x = await _testConnector.PacketRepository.Update()
+        // Act
+        await _testConnector.PacketRepository.Update()
             .Set(p => p.ParentId, 2)
             .Where(p => p.Id == 1)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate[0].Id.Should().Be(packetsBeforeUpdate[0].Id, "Packets Id before and after Update of ParentId does not match");
         packetsBeforeUpdate[0].BinaryData.SequenceEqual(packetsAfterUpdate[0].BinaryData).Should().BeTrue("Packets BinaryData before and after Update of ParentId does not match");
         packetsAfterUpdate[0].Channel.Should().Be(packetsBeforeUpdate[0].Channel, "Packets Channel before and after Update of ParentId does not match");
@@ -593,36 +631,38 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].ParentId.Should().Be(2, "ParentId was not updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_RetryCount_Success()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Processed, ParentId = 33 });
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.RetryCount, 2)
             .Where(p => p.Id == 1)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate[0].Id.Should().Be(packetsBeforeUpdate[0].Id, "Packets Id before and after Update of RetryCount does not match");
         packetsBeforeUpdate[0].BinaryData.SequenceEqual(packetsAfterUpdate[0].BinaryData).Should().BeTrue("Packets BinaryData before and after Update of RetryCount does not match");
         packetsAfterUpdate[0].Channel.Should().Be(packetsBeforeUpdate[0].Channel, "Packets Channel before and after Update of RetryCount does not match");
@@ -633,36 +673,39 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].RetryCount.Should().Be(2, "Packet RetryCount was not updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_DateCreated_Fails()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Processed, ParentId = 33 });
         _packets[0].DateCreated = DateTime.Now;
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
-
+        
+        // Act
         var action = async () => await _testConnector.PacketRepository.Update()
             .Set(p => p.DateCreated, DateTime.MinValue)
             .Where(p => p.Id == 1)
             .ExecuteAsync();
-
+        
+        // Assert
         await action.Should().ThrowAsync<InvalidOperationException>();
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
@@ -676,37 +719,39 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].DateChanged.Should().NotBe(DateTime.MinValue, "Packet DateCreated should not have been updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_DateChanged_Fails()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Processed, ParentId = 33 });
         _packets[0].DateChanged = DateTime.Now;
-
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
-
+        
+        // Act
         var action = async () => await _testConnector.PacketRepository.Update()
             .Set(p => p.DateChanged, DateTime.MinValue)
             .Where(p => p.Id == 1)
             .ExecuteAsync();
-
+        
+        // Assert
         await action.Should().ThrowAsync<InvalidOperationException>();
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
@@ -721,26 +766,28 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].DateChanged.Should().NotBe(DateTime.MinValue, "Packet DateChanged should not have been updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_AllFields_Success()
     {
+        // Arrange
         _packets.Add(new Packet { BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "B", Status = PacketStatus.Enqueued, ParentId = 33 });
         _packets[0].Metadata = "Before";
         _packets[0].DynamicField = "Before";
         _packets[0].DateCreated = DateTime.Now;
         _packets[0].DateChanged = DateTime.Now;
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddAsync(_packets[0]);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddAsync(_packets[0], TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.Metadata, "After")
             .Set(p => p.Channel, "A")
@@ -749,17 +796,17 @@ public class PacketRepositoryTests
             .Set(p => p.ParentId, 2)
             .Set(p => p.RetryCount, 2)
             .Where(p => p.Id == 1)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Id == 1)
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate[0].Id.Should().Be(packetsBeforeUpdate[0].Id, "Packet Id should not have been updated");
         packetsBeforeUpdate[0].BinaryData.SequenceEqual(packetsAfterUpdate[0].BinaryData).Should().BeTrue("Packet BinaryData should not have been updated");
         packetsAfterUpdate[0].Metadata.Should().Be("After", "Packet Metadata was not updated");
@@ -772,39 +819,42 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].DateChanged.Should().BeOnOrAfter(packetsBeforeUpdate[0].DateChanged!.Value, "Packet DateChanged should not have been updated");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_NoPacketsWithoutCondition_Unchanged()
     {
+        // Arrange
         _packets = [];
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddRangeAsync(_packets);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddRangeAsync(_packets, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.Status, PacketStatus.Processed)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate.Should().BeEmpty("There should be no packets to be updated since the Db is empty");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_WithoutCondition_AllPacketsUpdated()
     {
+        // Arrange
         _packets =
         [
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet0"), Channel = "A", Status = PacketStatus.InProgress, ParentId = 12 },
@@ -812,29 +862,30 @@ public class PacketRepositoryTests
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet2"), Channel = "D", Status = PacketStatus.FatalError, ParentId = 123 },
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet3"), Channel = "C", Status = PacketStatus.Processed, ParentId = 33 }
         ];
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddRangeAsync(_packets);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddRangeAsync(_packets, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.Status, PacketStatus.Processed)
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsBeforeUpdate.Should().HaveCount(_packets.Count, "The packets to be updated should be all, since there is no Where");
         packetsAfterUpdate.Should().HaveCount(_packets.Count, "The number of packets modified should be the same as the ampunt of total packets in the Db");
 
@@ -851,9 +902,10 @@ public class PacketRepositoryTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_WithConditionAndNoSet_Unchanged()
     {
+        // Arrange
         _packets =
         [
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet0"), Channel = "A", Status = PacketStatus.InProgress, ParentId = 12 },
@@ -861,32 +913,33 @@ public class PacketRepositoryTests
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet2"), Channel = "D", Status = PacketStatus.FatalError, ParentId = 123 },
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet3"), Channel = "C", Status = PacketStatus.Processed, ParentId = 33 }
         ];
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddRangeAsync(_packets);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddRangeAsync(_packets, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Channel == "A")
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository
             .Update()
             .Where(p => p.Channel == "A")
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Channel == "A")
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         for (var i = 0; i < packetsAfterUpdate.Length; i++)
         {
             var expected = packetsBeforeUpdate[i];
@@ -902,74 +955,78 @@ public class PacketRepositoryTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_WithCondition_NoUpdates()
     {
+        // Arrange
         _packets = [];
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddRangeAsync(_packets);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddRangeAsync(_packets, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Channel == "A")
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.Status, PacketStatus.Processed)
             .Where(p => p.Channel == "A")
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Channel == "A")
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsBeforeUpdate.Should().Equal([], "There should be no packets that have to be updated, since the Db is empty");
         packetsAfterUpdate.Should().Equal([], "The result of Updating no packets should be empty");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_WithCondition_SingleUpdate()
     {
+        // Arrange
         _packets =
         [
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet0"), Channel = "B", Status = PacketStatus.InProgress, ParentId = 12 },
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet1"), Channel = "A", Status = PacketStatus.FatalError, ParentId = 1 }
         ];
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddRangeAsync(_packets);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddRangeAsync(_packets, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Channel == "A")
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.Status, PacketStatus.Processed)
             .Where(p => p.Channel == "A")
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Channel == "A")
-            .ToArrayAsync();
-
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         packetsAfterUpdate[0].Status.Should().Be(PacketStatus.Processed, "Status was not updated for the extracted packet");
 
         packetsAfterUpdate[0].Id.Should().Be(packetsBeforeUpdate[0].Id, "Packet Id before and after Update of Status does not match.");
@@ -980,9 +1037,10 @@ public class PacketRepositoryTests
         packetsAfterUpdate[0].DateCreated.Should().Be(packetsBeforeUpdate[0].DateCreated, "Packet DateCreated before and after Update of Status does not match.");
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Update_WithCondition_MultipleUpdates()
     {
+        // Arrange
         _packets =
         [
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet0"), Channel = "A", Status = PacketStatus.InProgress, ParentId = 12 },
@@ -990,34 +1048,36 @@ public class PacketRepositoryTests
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet2"), Channel = "D", Status = PacketStatus.FatalError, ParentId = 123 },
             new Packet{ BinaryData = Encoding.UTF8.GetBytes("Packet3"), Channel = "C", Status = PacketStatus.Processed, ParentId = 33 }
         ];
-
-        var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        await dbContext.Packet.AddRangeAsync(_packets);
-        await dbContext.SaveChangesAsync();
+        
+        var dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await dbContext.Packet.AddRangeAsync(_packets, TestContext.Current.CancellationToken);
+        await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var packetsBeforeUpdate = await dbContext
             .Packet
             .Where(p => p.Channel == "A")
             .OrderBy(p => p.Id)
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         await dbContext.DisposeAsync();
 
+        // Act
         await _testConnector.PacketRepository.Update()
             .Set(p => p.Status, PacketStatus.Processed)
             .Where(p => p.Channel == "A")
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        dbContext = await _dbContextFactory.CreateDbContextAsync();
+        dbContext = await _dbContextFactory.CreateDbContextAsync(TestContext.Current.CancellationToken);
 
         var packetsAfterUpdate = await dbContext
             .Packet
             .Where(p => p.Channel == "A")
-            .ToArrayAsync();
+            .ToArrayAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         packetsAfterUpdate = [.. packetsAfterUpdate.OrderBy(p => p.Id)];
         await dbContext.DisposeAsync();
-
+        
+        // Assert
         for (var i = 0; i < packetsAfterUpdate.Length; i++)
         {
             packetsAfterUpdate[i].Status.Should().Be(PacketStatus.Processed, $"Packet {i} Status was not updated");
@@ -1031,8 +1091,7 @@ public class PacketRepositoryTests
         }
     }
 
-    [TestCleanup]
-    public async Task TestCleaup()
+    public async ValueTask DisposeAsync()
     {
         await _connection.CloseAsync();
         await _connection.DisposeAsync();

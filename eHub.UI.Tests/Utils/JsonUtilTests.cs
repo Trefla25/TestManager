@@ -1,32 +1,33 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using eHub.UI.Util;
 using FluentAssertions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace eHub.UI.Tests.Utils;
 
-[TestClass]
 public class JsonUtilTests
 {
-    [TestMethod]
+    [Fact]
     public void TryParse_WithValidJson_ReturnsTrue()
     {
-        var json = """
-        {
-            "person": {
-                "name": "John",
-                "age": 30,
-                "address": {
-                    "street": "123 Main St",
-                    "city": "Anytown"
-                },
-                "hobbies": ["reading", "gaming"]
-            }
-        }
-        """;
+        // Arrange
+        const string json = """
+                            {
+                                "person": {
+                                    "name": "John",
+                                    "age": 30,
+                                    "address": {
+                                        "street": "123 Main St",
+                                        "city": "Anytown"
+                                    },
+                                    "hobbies": ["reading", "gaming"]
+                                }
+                            }
+                            """;
 
+        // Act
         var result = JsonUtil.TryParse(json, out var document);
 
+        // Assert
         result.Should().BeTrue();
         document.Should().NotBeNull();
 
@@ -38,79 +39,98 @@ public class JsonUtilTests
         root.GetProperty("person").GetProperty("hobbies")[1].GetString().Should().Be("gaming");
     }
 
-    [TestMethod]
+    [Fact]
     public void TryParse_WithNullJson_ReturnsFalse()
     {
+        // Act
         var result = JsonUtil.TryParse(null, out var document);
 
+        // Assert
         result.Should().BeFalse();
         document.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void TryParse_WithEmptyJson_ReturnsFalse()
     {
+        // Act
         var result = JsonUtil.TryParse(string.Empty, out var document);
 
+        // Assert
         result.Should().BeFalse();
         document.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void TryParse_WithInvalidJson_ReturnsFalse()
     {
-        var invalidJson = "{\"key\": \"value\"";
+        // Arrange
+        const string invalidJson = "{\"key\": \"value\"";
 
+        // Act
         var result = JsonUtil.TryParse(invalidJson, out var document);
 
+        // Assert
         result.Should().BeFalse();
         document.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void TryGetElementFromPath_WithValidPath_ReturnsFalse()
     {
-        var json = "{\"person\": { \"name\": \"John\" }}";
+        // Arrange
+        const string json = "{\"person\": { \"name\": \"John\" }}";
         var document = JsonDocument.Parse(json);
 
+        // Act
         var result = document.TryGetElementFromPath("person.name", out var element);
 
+        // Assert
         result.Should().BeFalse();
         element.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void TryGetElementFromPath_WithNullPath_ReturnsFalse()
     {
-        var json = "{\"person\": { \"name\": \"John\" }}";
+        // Arrange
+        const string json = "{\"person\": { \"name\": \"John\" }}";
         var document = JsonDocument.Parse(json);
 
+        // Act
         var result = document.TryGetElementFromPath(null, out var element);
 
+        // Assert
         result.Should().BeFalse();
         element.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void TryGetElementFromPath_WithInvalidPath_ReturnsFalse()
     {
-        var json = "{\"person\": { \"name\": \"John\" }}";
+        // Arrange
+        const string json = "{\"person\": { \"name\": \"John\" }}";
         var document = JsonDocument.Parse(json);
 
+        // Act
         var result = document.TryGetElementFromPath("person.invalidPath", out var element);
 
+        // Assert
         result.Should().BeFalse();
         element.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void TryGetElementFromPath_WithEmptyPath_ReturnsFalse()
     {
-        var json = "{\"person\": { \"name\": \"John\" }}";
+        // Arrange
+        const string json = "{\"person\": { \"name\": \"John\" }}";
         var document = JsonDocument.Parse(json);
 
+        // Act
         var result = document.TryGetElementFromPath(string.Empty, out var element);
 
+        // Assert
         result.Should().BeFalse();
         element.Should().BeNull();
     }

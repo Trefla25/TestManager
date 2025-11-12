@@ -4,15 +4,15 @@ using FluentAssertions;
 
 namespace eHub.Tests.Connectors.PacketTransfer.Db;
 
-[TestClass]
 public class ExpressionMagicTests
 {
     private readonly ParameterExpression _fromParameter = Expression.Parameter(typeof(From), "f");
     private readonly ParameterExpression _toParameter = Expression.Parameter(typeof(To), "t");
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_BytesMember_Success()
     {       
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(From.BytesMember));
 
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
@@ -20,66 +20,73 @@ public class ExpressionMagicTests
             { _fromParameter, _toParameter }
         };
 
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
+        
+        // Assert
         var memberExpression = newExpression as MemberExpression;
-
         newExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
 
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().NotBeNull().And.Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().NotBeNull().And.Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.BytesMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_MemoryBytesToBytesMember_Success()
     {        
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(From.MemoryBytesMember));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
 
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
+        
+        // Assert
         var memberExpression = newExpression as MemberExpression;
-
         newExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.MemoryBytesMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_BytesToMemoryBytesMember_Success()
     {       
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(To.MemoryBytesMember));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
 
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(To), typeof(From), parameters);
+        
+        // Assert
         var memberExpression = newExpression as MemberExpression;
-
         newExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<From>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<From>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(From.MemoryBytesMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertLambda_ComplexConditions_Success()
     {
+        // Arrange
         // Example expression: f => f.Id == 1 && f.DateTimeMember > DateTime.UtcNow
         Expression<Func<From, bool>> fromLambda = f => f.Id == 1 && f.DateTimeMember > DateTime.UtcNow;
-
+        
         // Act
         var toLambda = ExpressionMagic.ConvertLambda(fromLambda, typeof(From), typeof(To), []);
-
+        
         // Assert
         toLambda.Should().NotBeNull();
         toLambda.Parameters[0].Type.Should().Be<To>();
@@ -96,18 +103,18 @@ public class ExpressionMagicTests
         var rightExpression = (BinaryExpression)binaryExpression.Right;
         ((MemberExpression)rightExpression.Left).Member.Name.Should().Be("DateTimeMember");
         ((MemberExpression)rightExpression.Left).Type.Should().Be<DateTime>();
-        (rightExpression.Right is MemberExpression || rightExpression.Right is MethodCallExpression).Should().BeTrue("DateTime comparison was not converted properly.");
+        (rightExpression.Right is MemberExpression or MethodCallExpression).Should().BeTrue("DateTime comparison was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertFilter_SimpleCondition_Success()
     {
         // Arrange
         Expression<Func<From, bool>> fromFilter = f => f.Id == 1;
-
+        
         // Act
         var toFilter = ExpressionMagic.ConvertFilter<From, To>(fromFilter);
-
+        
         // Assert
         // Check that the filter was converted correctly
         toFilter.Should().NotBeNull();
@@ -126,193 +133,220 @@ public class ExpressionMagicTests
         rightExpression.Value.Should().Be(1, "The constant value is not correctly preserved.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_NullExpression_ReturnsNull()
     {
+        // Arrange
         Expression? node = null;
+        
+        // Act
         var result = ExpressionMagic.ConvertNode(node, typeof(From), typeof(To), []);
+        
+        // Assert
         result.Should().BeNull("Result should be null when input node is null.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_ConstantValue_ReturnsUnchanged()
     {
+        // Arrange
         var initialExpression = Expression.Constant(1);
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), []);
+        
+        // Assert
         newExpression.GetType().Should().Be(initialExpression.GetType(), "Expression types are not equal");
         newExpression.Type.Should().Be(initialExpression.Type, "Expression constant types are not equal");
         ((ConstantExpression)newExpression).Value.Should().Be(initialExpression.Value, "Expression constant value are not equal");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_NumberMember_Success()
     {
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(From.NumberMember));
-
         var toParameter = Expression.Parameter(typeof(To), "f");
 
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, toParameter }
         };
-
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
-        var memberExpression = newExpression as MemberExpression;
 
+        // Assert
+        var memberExpression = newExpression as MemberExpression;
         newExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.NumberMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_NullableNumberMember_Success()
     {
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_toParameter, nameof(From.NullableNumberMember));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
-
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
+        
+        // Assert
         var memberExpression = newExpression as MemberExpression;
-
         newExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.NullableNumberMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_LongNumberMember_Success()
     {
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(From.LongNumberMember));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
-
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
+        
+        // Assert
         var memberExpression = newExpression as MemberExpression;
-
         newExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.LongNumberMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_NullableLongNumberMember_Success()
     {
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(From.NullableLongNumberMember));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
-
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
+        
+        // Assert
         var memberExpression = newExpression as MemberExpression;
-
         initialExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.NullableLongNumberMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_StringMember_Success()
     {
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(From.StringMember));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
-
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
-        var memberExpression = newExpression as MemberExpression;
 
+        // Assert
+        var memberExpression = newExpression as MemberExpression;
         initialExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.StringMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_NullableStringMember_Success()
     {
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(From.NullableStringMember));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
-
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
-        var memberExpression = newExpression as MemberExpression;
 
+        // Assert
+        var memberExpression = newExpression as MemberExpression;
         initialExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.NullableStringMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_DateTimeMember_Success()
     {
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(From.DateTimeMember));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
-
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
+        
+        // Assert
         var memberExpression = newExpression as MemberExpression;
-
         initialExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.DateTimeMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_NullableDateTimeMember_Success()
     {
+        // Arrange
         var initialExpression = Expression.PropertyOrField(_fromParameter, nameof(From.NullableDateTimeMember));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
-
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
+        
+        // Assert
         var memberExpression = newExpression as MemberExpression;
-
         initialExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         memberExpression.Should().NotBeNull();
-        memberExpression!.Expression.Should().NotBeNull();
-        memberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        memberExpression.Expression.Should().NotBeNull();
+        memberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         memberExpression.Member.Name.Should().Be(nameof(To.NullableDateTimeMember), "The member name was not converted properly.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_MixedMembers_OnlyConvertsRelevant()
     {
-        // Define the From type and another unrelated type (Another)
+        // Arrange
+        // Define the "From" type and another unrelated type ("Another")
         var anotherParameter = Expression.Parameter(typeof(Another), "a");
 
-        // Create a MemberExpression accessing the Id member of the From type
+        // Create a MemberExpression accessing the "Id" member of the "From" type
         var fromMemberExpression = Expression.PropertyOrField(_fromParameter, nameof(From.Id));
 
         // Create a MemberExpression accessing the AId member of the Another type
@@ -334,19 +368,19 @@ public class ExpressionMagicTests
             { _fromParameter, toParameter }
         };
 
+        // Act
         // Convert the entire expression (not just the body)
         var newExpression = ExpressionMagic.ConvertNode(combinedExpression, typeof(From), typeof(To), parameters);
 
+        // Assert
         // Extract the body of the converted expression
         var binaryExpression = (BinaryExpression)newExpression;
-
-        // Assertions
-
-        // Check that the From.Id part of the expression has been converted
+        
+        // Check that the "Id" part of the expression has been converted
         var newFromMemberExpression = binaryExpression.Left as MemberExpression;
         newFromMemberExpression.Should().NotBeNull("The left part of the BinaryExpression should be a MemberExpression.");
-        newFromMemberExpression!.Expression.Should().NotBeNull();
-        newFromMemberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        newFromMemberExpression.Expression.Should().NotBeNull();
+        newFromMemberExpression.Expression.Type.Should().Be<To>("The member expression's type was not converted properly.");
         newFromMemberExpression.Member.Name.Should().Be(nameof(To.Id), "The member name was not converted properly.");
 
         // Check that the Another.AId part of the expression has not been converted
@@ -355,10 +389,11 @@ public class ExpressionMagicTests
         newAnotherMemberExpression.Should().Be(anotherMemberExpression, "The member expression should not have been converted.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_UnrelatedMember_Unchanged()
     {
-        // Define the From type and another unrelated type
+        // Arrange
+        // Define the "From" type and another unrelated type
         var anotherParameter = Expression.Parameter(typeof(Another), "a");
 
         // Create a MemberExpression accessing a member of the AnotherClass type (e.g., "Description")
@@ -372,17 +407,19 @@ public class ExpressionMagicTests
         {
             { _fromParameter, toParameter }
         };
-
+        
+        // Act
         // Convert the MemberExpression
         var newExpression = ExpressionMagic.ConvertNode(memberExpression, typeof(From), typeof(To), parameters);
-
-        // Assertions
+        
+        // Assert
         newExpression.Should().Be(memberExpression, "The member expression should not have been converted.");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_BinaryExpression_Success()
     {
+        // Arrange
         var fromLeft = Expression.Parameter(typeof(From), "l");
         var fromRight = Expression.Parameter(typeof(From), "r");
 
@@ -400,45 +437,54 @@ public class ExpressionMagicTests
             { fromLeft, toLeft },
             { fromRight, toRight }
         };
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
-
+        
+        // Assert
         newExpression.GetType().Should().Be(initialExpression.GetType(), "Expression types are not equal");
 
-        initialExpression.Type.Should().Be(initialExpression.Type, "Expression constant types are not equal");// nam reusit sa testez asta, pentru ca nu pot
+        initialExpression.Type.Should().Be(initialExpression.Type, "Expression constant types are not equal");
         initialExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         ((BinaryExpression)newExpression).Left.Type.Should().Be<To>("Left side of the binary operation did not convert properly");
         ((BinaryExpression)newExpression).Right.Type.Should().Be<To>("Right side of the binary operation did not convert properly");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_UnaryExpression_Success()
     {
+        // Arrange
         var initialExpression = Expression.MakeUnary(ExpressionType.Convert, _fromParameter, typeof(object));
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { _fromParameter, _toParameter }
         };
 
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
-
+        
+        // Assert
         newExpression.GetType().Should().Be(initialExpression.GetType(), "Expression types are not equal");
         initialExpression.Type.Should().Be(initialExpression.Type, "Expression constant types are not equal");
         initialExpression.NodeType.Should().Be(initialExpression.NodeType, "Expression NodeType did not convert properly");
         ((UnaryExpression)newExpression).Operand.Type.Should().Be<To>("Operand of the unary operation did not convert properly");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_LambdaExpression_Success()
     {
+        // Arrange
         var initialExpression = Expression.Lambda(_fromParameter, _fromParameter);
+        
+        // Act
         // Call ConvertNode with parameters
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), []);
-
+        
+        // Assert
         // Compare the types at the expression level, not at the specific type level
         newExpression.Type.GetGenericTypeDefinition().Should().Be(initialExpression.Type.GetGenericTypeDefinition(), "Expression delegate types are not equal");
 
-        initialExpression.NodeType.Should().Be(initialExpression.NodeType, "Expressions Nodetype types are not equal");
+        initialExpression.NodeType.Should().Be(initialExpression.NodeType, "Expressions NodeType types are not equal");
 
         // Check that the body of the lambda has been converted to the correct type
         _toParameter.Type.Should().Be(((LambdaExpression)newExpression).Body.Type, "Lambda body type did not convert properly")
@@ -448,25 +494,26 @@ public class ExpressionMagicTests
         _fromParameter.Name.Should().Be(((LambdaExpression)newExpression).Parameters[0].Name, "Lambda parameter name did not convert properly");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_ParameterExpression_Success()
     {
+        // Arrange
         var initialExpression = Expression.Parameter(typeof(From), "f");
-
         var parameters = new Dictionary<ParameterExpression, ParameterExpression>
         {
             { initialExpression, _toParameter }
         };
-
+        
+        // Act
         var newExpression = ExpressionMagic.ConvertNode(initialExpression, typeof(From), typeof(To), parameters);
-
-        // Assertions
+        
+        // Assert
         newExpression.GetType().Should().Be(initialExpression.GetType(), "Expression types are not equal");
         _toParameter.Type.Should().Be(_toParameter.Type, "Expression types did not convert properly");
         ((ParameterExpression)newExpression).Name.Should().Be(_toParameter.Name, "Parameter name did not convert properly");
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_MethodCallExpression_Success()
     {
         // Arrange
@@ -481,10 +528,10 @@ public class ExpressionMagicTests
         {
             { _fromParameter, toParam }
         };
-
+        
         // Act
         var result = ExpressionMagic.ConvertNode(methodCallExpression, typeof(From), typeof(To), parameterMap);
-
+        
         // Assert
         result.Should().NotBeNull();
         result.Should().BeAssignableTo<MethodCallExpression>();
@@ -502,10 +549,11 @@ public class ExpressionMagicTests
         resultMethodCall.Arguments.Should().HaveElementAt(0, toParam);
     }
 
-    [TestMethod]
+    [Fact]
     public void ConvertNode_MixedExpression_Success()
     {
-        // Define the From type and another unrelated type (Another)
+        // Arrange
+        // Define the "From" type and another unrelated type ("Another")
         var anotherParameter = Expression.Parameter(typeof(Another), "a");
         var extraParameter = Expression.Parameter(typeof(string), "extra");
         var callParameter = Expression.Parameter(typeof(IBaseInterface), "o");
@@ -513,7 +561,7 @@ public class ExpressionMagicTests
         // Create a constant expression
         var constantExpression = Expression.Constant(42);
 
-        // Create a MemberExpression accessing the Id member of the From type
+        // Create a MemberExpression accessing the "Id" member of the "From" type
         var fromMemberExpression = Expression.PropertyOrField(_fromParameter, nameof(From.Id));
 
         // Create a MemberExpression accessing the AId member of the Another type
@@ -536,17 +584,19 @@ public class ExpressionMagicTests
             extraParameter
         );
 
+        // Act
         // Convert the entire expression (not just the body)
         var newExpression = (LambdaExpression)ExpressionMagic.ConvertNode(combinedExpression, typeof(From), typeof(To), []);
 
+        // Assert
         // Extract the body of the converted expression, which should now be a MethodCallExpression
         var newMethodCallExpression = newExpression.Body as MethodCallExpression;
         var firstArg = newMethodCallExpression?.Arguments[0] as BinaryExpression;
         var r = firstArg?.Right as MemberExpression;
+        
         var x = r?.Expression?.Type;
-
         newMethodCallExpression.Should().NotBeNull("The outermost expression should be a MethodCallExpression.");
-        newMethodCallExpression!.Method.Name.Should().Be(methodInfo.Name, "The method name should be the same as before the conversion.");
+        newMethodCallExpression.Method.Name.Should().Be(methodInfo.Name, "The method name should be the same as before the conversion.");
         x.Should().Be<To>("The method call should be on the To type.");
 
         // The object on which ToString is called should be a BinaryExpression
@@ -554,24 +604,24 @@ public class ExpressionMagicTests
         firstLevelBinary.Should().NotBeNull("The object of the method call should be a BinaryExpression.");
 
         // Left side of the first binary should be a BinaryExpression
-        var secondLevelBinary = firstLevelBinary?.Left as BinaryExpression;
+        var secondLevelBinary = firstLevelBinary.Left as BinaryExpression;
         secondLevelBinary.Should().NotBeNull("The left side of the first binary expression should be another BinaryExpression.");
 
         // Right side of the first binary should be the From.Id (now converted to To.Id)
-        var newFromMemberExpression = firstLevelBinary?.Right as MemberExpression;
+        var newFromMemberExpression = firstLevelBinary.Right as MemberExpression;
         newFromMemberExpression.Should().NotBeNull("The right side of the first binary expression should be a MemberExpression.");
-        newFromMemberExpression!.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
+        newFromMemberExpression.Expression!.Type.Should().Be<To>("The member expression's type was not converted properly.");
         newFromMemberExpression.Member.Name.Should().Be(nameof(To.Id), "The member name was not converted properly.");
 
         // Left side of the second binary should be the Another.AId (not converted)
-        var newAnotherMemberExpression = secondLevelBinary?.Left as MemberExpression;
+        var newAnotherMemberExpression = secondLevelBinary.Left as MemberExpression;
         newAnotherMemberExpression.Should().NotBeNull("The left side of the second binary expression should be a MemberExpression.")
             .And.Be(anotherMemberExpression, "The member expression should not have been converted.");
         // Right side of the second binary should be the unary expression (negated constant)
-        var newUnaryExpression = secondLevelBinary?.Right as UnaryExpression;
+        var newUnaryExpression = secondLevelBinary.Right as UnaryExpression;
         newUnaryExpression.Should().NotBeNull("The right side of the second binary expression should be a UnaryExpression.");
         ExpressionType.Negate.Should().Be(ExpressionType.Negate, "The unary expression should be a negation.");
-        ((ConstantExpression)newUnaryExpression!.Operand).Value.Should().Be(42, "The unary expression should negate the constant value 42.");
+        ((ConstantExpression)newUnaryExpression.Operand).Value.Should().Be(42, "The unary expression should negate the constant value 42.");
     }
 
     private interface IBaseInterface
@@ -628,7 +678,7 @@ public class ExpressionMagicTests
 
     }
 
-    public class Another
+    private class Another
     {
         internal int AId { get; set; }
     }

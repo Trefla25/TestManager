@@ -4,14 +4,11 @@
         <TargetFramework>net9.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-
-        <IsPackable>false</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="eController.Util" />
         <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-        <PackageReference Include="NSubstitute" />
     </ItemGroup>
 
     <ItemGroup>

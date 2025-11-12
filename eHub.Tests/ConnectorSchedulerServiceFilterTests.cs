@@ -13,25 +13,22 @@ using NSubstitute;
 
 namespace eHub.Tests;
 
-[TestClass]
 public class ConnectorSchedulerServiceFilterTests
 {
     private const string ConnectorName = "MyConnector";
-    private ISchedulerServiceProvider _schedulerServiceProvider = null!;
-    private ISchedulerService _schedulerService = null!;
-    private ConnectorSchedulerServiceFilter _serviceFilter = null!;
+    private readonly ISchedulerService _schedulerService;
+    private readonly ConnectorSchedulerServiceFilter _serviceFilter;
 
     public class ConnectorSchedulerControllerSpy : ConnectorSchedulerController
     {
         public ISchedulerService SchedulerService => _schedulerService;
     }
 
-    [TestInitialize]
-    public void TestInitialize()
+    public ConnectorSchedulerServiceFilterTests()
     {
-        _schedulerServiceProvider = Substitute.For<ISchedulerServiceProvider>();
+        var schedulerServiceProvider = Substitute.For<ISchedulerServiceProvider>();
         _schedulerService = Substitute.For<ISchedulerService>();
-        _schedulerServiceProvider.TryGetSchedulerService(ConnectorName, out Arg.Any<ISchedulerService?>())
+        schedulerServiceProvider.TryGetSchedulerService(ConnectorName, out Arg.Any<ISchedulerService?>())
             .Returns(call =>
             {
                 call[1] = _schedulerService;
@@ -39,65 +36,80 @@ public class ConnectorSchedulerServiceFilterTests
             });
 
         _serviceFilter = new ConnectorSchedulerServiceFilter(
-            _schedulerServiceProvider,
+            schedulerServiceProvider,
             NullLogger<ConnectorSchedulerServiceFilter>.Instance);
     }
 
-    [TestMethod]
+    [Fact]
     public void OnActionExecuting_WithValidConnectorName_SetsSchedulerService()
     {
+        // Arrange
         var controller = new ConnectorSchedulerControllerSpy();
         var context = CreateActionContext(controller, ConnectorName);
-
+        
+        // Act
         _serviceFilter.OnActionExecuting(context);
-
+        
+        // Assert
         controller.SchedulerService.Should().BeSameAs(_schedulerService);
     }
 
-    [TestMethod]
+    [Fact]
     public void OnActionExecuting_WithInvalidConnectorName_ReturnsBadRequest()
     {
+        // Arrange
         var controller = new ConnectorSchedulerControllerSpy();
         var context = CreateActionContext(controller, "OtherConnector");
-
+        
+        // Act
         _serviceFilter.OnActionExecuting(context);
-
+        
+        // Assert
         context.Result.Should().BeOfType<BadRequestObjectResult>();
         controller.SchedulerService.Should().BeNull();
 
     }
 
-    [TestMethod]
+    [Fact]
     public void OnActionExecuting_WithEmptyConnectorName_ReturnsBadRequest()
     {
+        // Arrange
         var controller = new ConnectorSchedulerControllerSpy();
         var context = CreateActionContext(controller, "");
-
+        
+        // Act
         _serviceFilter.OnActionExecuting(context);
-
+        
+        // Assert
         context.Result.Should().BeOfType<BadRequestObjectResult>();
         controller.SchedulerService.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void OnActionExecuting_WithInvalidControllerType_ReturnServerError()
     {
+        // Arrange
         var fakeController = new object();
         var context = CreateActionContext(fakeController, ConnectorName);
-
+        
+        // Act
         _serviceFilter.OnActionExecuting(context);
-
+        
+        // Assert
         context.Result.Should().BeOfType<StatusCodeResult>().Which.StatusCode.Should().Be(StatusCodes.Status500InternalServerError);
     }
 
-    [TestMethod]
+    [Fact]
     public void OnActionExecuting_WithMissingNameRouteParameter_DoesNothing()
     {
+        // Arrange
         var controller = new ConnectorSchedulerControllerSpy();
         var context = CreateActionContext(controller);
-
+        
+        // Act
         _serviceFilter.OnActionExecuting(context);
-
+        
+        // Assert
         context.Result.Should().BeNull();
         controller.SchedulerService.Should().BeNull();
     }
@@ -118,4 +130,3 @@ public class ConnectorSchedulerServiceFilterTests
             controller);
     }
 }
-

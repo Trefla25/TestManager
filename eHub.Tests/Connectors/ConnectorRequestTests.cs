@@ -6,19 +6,20 @@ using System.Text.Json;
 
 namespace eHub.Tests.Connectors;
 
-[TestClass]
 public class ConnectorRequestTests
 {
     private const string ConnectorName = "MyConnector";
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
-    [TestMethod]
+    [Fact]
     public void ParameterlessConstructor_WhenPropertiesSet_SetsAllValues()
     {
+        // Arrange
         var content = new ReadOnlyMemory<byte>([7, 8, 9]);
-        var contentType = MediaTypeNames.Text.Plain;
+        const string contentType = MediaTypeNames.Text.Plain;
         var http = new ConnectorRequest.HttpConnectorRequest("/test", "POST");
-
+        
+        // Act
         var request = new ConnectorRequest
         {
             Content = content,
@@ -26,50 +27,59 @@ public class ConnectorRequestTests
             ConnectorName = ConnectorName,
             Http = http
         };
-
+        
+        // Assert
         request.Content.Should().BeEquivalentTo(content);
         request.ContentType.Should().Be(contentType);
         request.ConnectorName.Should().Be(ConnectorName);
         request.Http.Should().Be(http);
     }
 
-    [TestMethod]
+    [Fact]
     public void Constructor_WithoutHttp_SetsValuesAndLeavesHttpNull()
     {
+        // Arrange
         var content = new ReadOnlyMemory<byte>([7, 8, 9]);
-        var contentType = MediaTypeNames.Text.Plain;
-
+        const string contentType = MediaTypeNames.Text.Plain;
+        
+        // Act
         var request = new ConnectorRequest(content, contentType, ConnectorName);
-
+        
+        // Assert
         request.Content.Should().BeEquivalentTo(content);
         request.ContentType.Should().Be(contentType);
         request.ConnectorName.Should().Be(ConnectorName);
         request.Http.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void Constructor_WithHttp_SetsAllValues()
     {
+        // Arrange
         var content = new ReadOnlyMemory<byte>([7, 8, 9]);
-        var contentType = MediaTypeNames.Text.Plain;
+        const string contentType = MediaTypeNames.Text.Plain;
         var http = new ConnectorRequest.HttpConnectorRequest("/test", "POST");
-
+        
+        // Act
         var request = new ConnectorRequest(content, contentType, ConnectorName, http);
-
+        
+        // Assert
         request.Content.Should().BeEquivalentTo(content);
         request.ContentType.Should().Be(contentType);
         request.ConnectorName.Should().Be(ConnectorName);
         request.Http.Should().Be(http);
     }
 
-    [TestMethod]
+    [Fact]
     public void ParameterlessHttpConstructor_WhenPropertiesSet_SetsAllValues()
     {
-        var path = "/test/45";
-        var method = "POST";
+        // Arrange
+        const string path = "/test/45";
+        const string method = "POST";
         var routeParameters = new Dictionary<string, string>() { { "id", "45" } };
         var headers = new Dictionary<string, StringValues>() { { "X-Custom-Header", "CustomValue" } };
-
+        
+        // Act
         var request = new ConnectorRequest.HttpConnectorRequest
         {
             Path = path,
@@ -77,38 +87,45 @@ public class ConnectorRequestTests
             RouteParameters = routeParameters,
             Headers = headers
         };
-
+        
+        // Assert
         request.Path.Should().Be(path);
         request.Method.Should().Be(method);
         request.RouteParameters.Should().BeEquivalentTo(routeParameters);
         request.Headers.Should().BeEquivalentTo(headers);
     }
 
-    [TestMethod]
+    [Fact]
     public void HttpConstructor_OnlyRequired_SetsValues()
     {
-        var path = "/test";
-        var method = "POST";
+        // Arrange
+        const string path = "/test";
+        const string method = "POST";
 
+        // Act
         var request = new ConnectorRequest.HttpConnectorRequest(path, method);
 
-       request.Path.Should().Be(path);
+        // Assert
+        request.Path.Should().Be(path);
         request.Method.Should().Be(method);
         request.RouteParameters.Should().BeNull();
         request.Headers.Should().BeNull();
     }
 
-    [TestMethod]
+    [Fact]
     public void HttpConstructor_AllParameters_SetsAllValues()
     {
-        var path = "/test/45";
-        var method = "POST";
+        // Arrange
+        const string path = "/test/45";
+        const string method = "POST";
         var routeParameters = new Dictionary<string, string>() { { "id", "45" } };
         var headers = new Dictionary<string, StringValues>() { { "X-Custom-Header", "CustomValue" } };
         var query = new Dictionary<string, StringValues>() { { "search", "value" } };
-
+        
+        // Act
         var request = new ConnectorRequest.HttpConnectorRequest(path, method, routeParameters, headers, query);
-
+        
+        // Assert
         request.Path.Should().Be(path);
         request.Method.Should().Be(method);
         request.RouteParameters.Should().BeEquivalentTo(routeParameters);
@@ -116,9 +133,10 @@ public class ConnectorRequestTests
         request.Query.Should().BeEquivalentTo(query);
     }
 
-    [TestMethod]
+    [Fact]
     public void JsonSerialize_FromConnectorRequest_SerializesRequest()
     {
+        // Arrange
         var request = new ConnectorRequest(
             content: new ReadOnlyMemory<byte>([7, 8, 9]),
             contentType: MediaTypeNames.Text.Plain,
@@ -130,7 +148,7 @@ public class ConnectorRequestTests
                 headers: new Dictionary<string, StringValues>() { { "Empty", "" }, { "Single", "value" }, { "Multiple", new(["value1", "value2"]) } },
                 query: new Dictionary<string, StringValues>() { { "single", "value" }, { "multiple", new(["value1", "value2"]) } }));
 
-        var expectedJson = """
+        const string expectedJson = """
         {
           "Content": "BwgJ",
           "ContentType": "text/plain",
@@ -159,17 +177,22 @@ public class ConnectorRequestTests
           }
         }
         """;
-
+        
+        // Act
         var json = JsonSerializer.Serialize(request, _jsonOptions);
-
+        
+        // Assert
         json.Should().NotBeNull();
-        json.Should().BeEquivalentTo(expectedJson);
+        var normalizedJson = json.Replace("\r\n", "\n");
+        var normalizedExpected = expectedJson.Replace("\r\n", "\n");
+        normalizedJson.Should().Be(normalizedExpected);
     }
 
-    [TestMethod]
+    [Fact]
     public void JsonDeserialize_FromJson_DeserializesRequest()
     {
-        var json = """
+        // Arrange
+        const string json = """
         {
           "Content": "BwgJ",
           "ContentType": "text/plain",
@@ -209,10 +232,11 @@ public class ConnectorRequestTests
                 routeParameters: new Dictionary<string, string>() { { "id", "45" } },
                 headers: new Dictionary<string, StringValues>() { { "Empty", "" }, { "Single", "value" }, { "Multiple", new(["value1", "value2"]) } },
                 query: new Dictionary<string, StringValues>() { { "single", "value" }, { "multiple", new(["value1", "value2"]) } }));
-
-
+        
+        // Act
         var request = JsonSerializer.Deserialize<ConnectorRequest>(json);
-
+        
+        // Assert
         request.Should().NotBeNull();
         request.Content.ToArray().Should().BeEquivalentTo(expectedRequest.Content.ToArray());
         request.ContentType.Should().Be(expectedRequest.ContentType);
