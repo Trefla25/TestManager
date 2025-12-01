@@ -22,6 +22,7 @@ using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.OpenApi.Models;
 using OpenTelemetry.Metrics;
+using eConfigurationManager.Library.Extensions;
 
 if (WindowsServiceHelpers.IsWindowsService())
 {
@@ -33,6 +34,12 @@ ILogger logger = NullLogger.Instance;
 try
 {
     var webAppBuilder = WebApplication.CreateBuilder(args);
+
+    webAppBuilder.Configuration.AddDynamicConfigurationManagement(webAppBuilder.Services, webAppBuilder.Configuration);
+
+    // Add event processing for dynamic reloads
+    webAppBuilder.Services.AddConfigurationManagementEventsProcessing(webAppBuilder.Configuration);
+
     webAppBuilder.Host.UseWindowsService();
     webAppBuilder.Host.UseEffortlessConfiguration(setup =>
     {

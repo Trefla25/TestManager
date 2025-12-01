@@ -27,6 +27,7 @@
     <PackageVersion Include="eController.WebUI.PlugIn" Version="2.0.12" />
     <PackageVersion Include="eController.WebUI.Utility" Version="4.0.12" />
     <PackageVersion Include="ElementLogic.Configuration" Version="0.13.19" />
+    <PackageVersion Include="ElementLogic.ConfigurationManager.Library" Version="0.1.168" />
     <PackageVersion Include="ElUI.BlazorDiagrams" Version="1.2.1" />
     <PackageVersion Include="ElUI.BlazorDiagrams.Serialization" Version="1.2.1" />
     <PackageVersion Include="ElUI.ComponentLib" Version="3.3.0" />
@@ -88,7 +89,7 @@
     <PackageVersion Include="OpenTelemetry" Version="1.12.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.11.2-beta.1" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.12.0" />
-    <PackageVersion Include="Polly" Version="8.5.2" />
+    <PackageVersion Include="Polly" Version="8.6.3" />
     <PackageVersion Include="PolySharp" Version="1.15.0" />
     <PackageVersion Include="Pose" Version="1.2.1" />
     <PackageVersion Include="RabbitMQ.Client" Version="7.1.2" />
