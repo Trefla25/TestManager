@@ -57,6 +57,20 @@
           "JetBrains.Annotations": "2025.2.2"
         }
       },
+      "ElementLogic.MessageBusClient": {
+        "type": "Direct",
+        "requested": "[0.5.13, )",
+        "resolved": "0.5.13",
+        "contentHash": "VrldG/6a9rVxsiqkpm98aWcRY7HUH23thfd+UvQn3t16Bp5r6pvOYSrKRBxtBrAQWNqreaNwCfMRPfbDJwg05g==",
+        "dependencies": {
+          "CloudNative.CloudEvents": "2.8.0",
+          "CloudNative.CloudEvents.SystemTextJson": "2.8.0",
+          "Microsoft.Extensions.Http.Resilience": "9.6.0",
+          "NATS.Client.JetStream": "2.6.7",
+          "Polly": "8.6.4",
+          "Polly.Contrib.WaitAndRetry": "1.1.1"
+        }
+      },
       "ElUI.ComponentLib": {
         "type": "Direct",
         "requested": "[3.3.0, )",
@@ -231,11 +245,11 @@
       },
       "Polly": {
         "type": "Direct",
-        "requested": "[8.6.3, )",
-        "resolved": "8.6.3",
-        "contentHash": "8X6mWAGDrgTHyqDthifiv9QGR+FgnRe13/sPhSR4ZbhXCqUDJuLrVqunB39LLbf87TXZ+06dMdopd6LpY4oK0w==",
+        "requested": "[8.6.4, )",
+        "resolved": "8.6.4",
+        "contentHash": "uuBsDoBw0oYrMe3uTWRjkT2sIkKh+ZZnnDrLb4Z+QANfeA4+7FJacx6E8CY5GAxXRoSgFrvUADEAQ7DPF6fGiw==",
         "dependencies": {
-          "Polly.Core": "8.6.3"
+          "Polly.Core": "8.6.4"
         }
       },
       "Riok.Mapperly": {
@@ -320,19 +334,6 @@
         "contentHash": "rxzZ4t7ytffZiWPxQ/pGc8IgGhfUzgaGad64bhZSPzhr2aO0uS8QylVuW87Dzp6BP00L5UO0nSzm3nmsFpwlew==",
         "dependencies": {
           "ElementLogic.MessageBusClient": "0.5.5"
-        }
-      },
-      "ElementLogic.MessageBusClient": {
-        "type": "Transitive",
-        "resolved": "0.5.5",
-        "contentHash": "lmTS0Haz/cvB35Hh+c81XoPmZot0ZPdBCu9v8HeRwIYRj1qT3N7oVuckpF00BQTSpC+TuV3BCVL3rZDqT+dU8g==",
-        "dependencies": {
-          "CloudNative.CloudEvents": "2.8.0",
-          "CloudNative.CloudEvents.SystemTextJson": "2.8.0",
-          "Microsoft.Extensions.Http.Resilience": "9.6.0",
-          "NATS.Client.JetStream": "2.6.7",
-          "Polly": "8.6.3",
-          "Polly.Contrib.WaitAndRetry": "1.1.1"
         }
       },
       "Humanizer.Core": {
@@ -623,8 +624,8 @@
       },
       "Polly.Core": {
         "type": "Transitive",
-        "resolved": "8.6.3",
-        "contentHash": "xRlcE+1FidqIfZ7zxBT6klSblJ/7MAJq1x5yvYoLnwNhs8Xc2gp3Srf8wHG2NpFxVBqrldc3svhkMPJjSzTmzw=="
+        "resolved": "8.6.4",
+        "contentHash": "4AWqYnQ2TME0E+Mzovt1Uu+VyvpR84ymUldMcPw7Mbj799Phaag14CKrMtlJGx5jsvYP+S3oR1QmysgmXoD5cw=="
       },
       "Polly.Extensions": {
         "type": "Transitive",

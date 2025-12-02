@@ -27,6 +27,7 @@
         <PackageReference Include="eController.WebUI.Library" />
         <PackageReference Include="ElementLogic.Configuration" />
         <PackageReference Include="ElementLogic.ConfigurationManager.Library" />
+        <PackageReference Include="ElementLogic.MessageBusClient" />
         <PackageReference Include="ElUI.ComponentLib" />
         <PackageReference Include="eMessenger" />
         <PackageReference Include="ePlugin.Engine" />

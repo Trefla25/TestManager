@@ -1,17 +1,14 @@
 {
   "$schema": "http://json.schemastore.org/launchsettings.json",
-    "environmentVariables": {
-      "ASPNETCORE_ENVIRONMENT": "Development",
-      "ConfigurationManagement__BaseUrl": "http://localhost:5278",
-      "ConfigurationManagement__SchemeVersion": "1.0.0" // Must match the version folder in your config repo
-    },
     "profiles": {
         "eHub [Dev]": {
             "commandName": "Project",
             "launchBrowser": true,
-            "environmentVariables": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            },
+          "environmentVariables": {
+            "ASPNETCORE_ENVIRONMENT": "eHub.Development.default",
+            "ConfigurationManagement__BaseUrl": "http://localhost:5278",
+            "ConfigurationManagement__SchemeVersion": "1.0.0" // Must match the version folder in your 
+          },
             "commandLineArgs": "--econfig-root=./econfig_root --econfig-displayname=EHUB_Dev"
         },
 
